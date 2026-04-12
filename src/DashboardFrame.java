@@ -31,18 +31,6 @@ public class DashboardFrame extends JFrame {
 
         add(topBar, BorderLayout.NORTH);
 
-        // 📂 SIDEBAR
-        JPanel sidebar = new JPanel();
-        sidebar.setPreferredSize(new Dimension(200, 0));
-        sidebar.setBackground(new Color(245, 245, 245));
-        sidebar.setLayout(new GridLayout(5, 1));
-
-        sidebar.add(new JButton("Option 1"));
-        sidebar.add(new JButton("Option 2"));
-        sidebar.add(new JButton("Option 3"));
-
-        add(sidebar, BorderLayout.WEST);
-
         // 🧠 MAIN PANEL (CHANGES)
         mainPanel = new JPanel();
         mainPanel.setBackground(Color.WHITE);
@@ -53,6 +41,9 @@ public class DashboardFrame extends JFrame {
         timeBtn.addActionListener(e -> showTime());
         healthBtn.addActionListener(e -> showHealth());
         financeBtn.addActionListener(e -> showFinance());
+
+        // open Time module by default
+        showTime();
 
         setVisible(true);
     }
@@ -66,10 +57,13 @@ public class DashboardFrame extends JFrame {
 
     // MODULE VIEWS
 
-    private void showTime() {
-        mainPanel.removeAll();
-        mainPanel.add(new JLabel("Time Module (Calendar coming soon)"));
-        refresh();
+    private void showTime() { 
+    mainPanel.removeAll();
+    mainPanel.setLayout(new BorderLayout());
+
+    mainPanel.add(new TimePanel(), BorderLayout.CENTER);
+
+    refresh();
     }
 
     private void showHealth() {
