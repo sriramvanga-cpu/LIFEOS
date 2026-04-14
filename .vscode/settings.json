@@ -1,5 +1,13 @@
 {
-  "java.project.referencedLibraries": [
-    "lib/ojdbc17.jar"
-  ]
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-25",
+            "path": "/Library/Java/JavaVirtualMachines/amazon-corretto-25.jdk/Contents/Home",
+            "default": true
+        }
+    ],
+    "java.jdt.ls.java.home": "/Library/Java/JavaVirtualMachines/amazon-corretto-25.jdk/Contents/Home",
+    "java.project.referencedLibraries": [
+        "lib/postgresql-42.7.10.jar"
+    ]
 }

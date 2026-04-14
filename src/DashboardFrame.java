@@ -154,13 +154,10 @@ public class DashboardFrame extends JFrame {
     }
 
     private void showFinance() {
+
         mainPanel.removeAll();
-        mainPanel.setLayout(new GridBagLayout());
-        
-        JLabel msg = new JLabel("Finance Module Coming Soon...");
-        msg.setFont(new Font("Segoe UI", Font.ITALIC, 18));
-        msg.setForeground(Color.GRAY);
-        mainPanel.add(msg);
+        mainPanel.setLayout(new BorderLayout());
+        mainPanel.add(new FinancePanel(currentUserId), BorderLayout.CENTER);
         
         refresh();
     }

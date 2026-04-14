@@ -173,14 +173,16 @@ public class SignupFrame extends JFrame {
         }
 
         try {
-            int userId = (int) (System.currentTimeMillis() % 1000000); // simple id for now
-            dao.registerUser(userId, name, email, password, dob);
-            JOptionPane.showMessageDialog(this, "Account created successfully!", "Success", JOptionPane.PLAIN_MESSAGE);
-
-            setVisible(false);
-            previousFrame.setVisible(true);
-        } catch (Exception ex) {
-            errorLabel.setText("Signup failed (email may already exist)");
-        }
+        // Call the updated DAO method
+        dao.registerUser(name, email, password, dob); 
+        
+        JOptionPane.showMessageDialog(this, "Account created successfully!", "Success", JOptionPane.PLAIN_MESSAGE);
+        setVisible(false);
+        previousFrame.setVisible(true);
+    } catch (Exception ex) {
+        // NOW this will actually trigger if the database insert fails
+        ex.printStackTrace(); // Look at your VS Code console for the REAL error
+        errorLabel.setText("Signup failed: " + ex.getMessage());
+    }
     }
 }
