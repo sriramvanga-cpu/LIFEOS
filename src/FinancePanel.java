@@ -30,6 +30,8 @@ public class FinancePanel extends JPanel {
     private JPanel accountsListPanel;
     private JTabbedPane tabbedPane;
     private PieChartPanel pieChartPanel;
+    private YearlyExpenseBarChart yearlyBarChart;
+    private JSpinner yearSpinner;
 
     public FinancePanel(int userId) {
         System.out.println("FinancePanel constructor started for user: " + userId);
@@ -147,7 +149,7 @@ public class FinancePanel extends JPanel {
         addBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
         addBtn.setBackground(PRIMARY_BLUE);
         addBtn.setForeground(WHITE);
-        addBtn.setOpaque(true); 
+        addBtn.setOpaque(true);
         addBtn.setBorderPainted(false);
         addBtn.setFocusPainted(false);
         addBtn.setPreferredSize(new Dimension(400, 50));
@@ -179,7 +181,7 @@ public class FinancePanel extends JPanel {
             } else if (t.transDate != null) {
                 transDate = t.transDate.toLocalDate();
             } else {
-                continue; // skip invalid entries
+                continue;
             }
             if (!transDate.isBefore(monthStart) && !transDate.isAfter(monthEnd)) {
                 monthTransactions.add(t);
@@ -220,10 +222,10 @@ public class FinancePanel extends JPanel {
     private JPanel createTransactionRow(Transaction t) {
         JPanel row = new JPanel(new BorderLayout());
         row.setBackground(WHITE);
-        row.setMaximumSize(new Dimension(2000, 70));
+        row.setMaximumSize(new Dimension(2000, 55)); // tighter height
         row.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, LIGHT_BLUE),
-                new EmptyBorder(10, 20, 10, 20)));
+                new EmptyBorder(6, 15, 6, 15))); // tighter padding
 
         String accountName = getAccountName(t.accountId);
         String toAccountName = t.toAccountId != null ? getAccountName(t.toAccountId) : "";
@@ -336,6 +338,30 @@ public class FinancePanel extends JPanel {
         content.add(pieChartPanel);
         content.add(Box.createRigidArea(new Dimension(0, 20)));
 
+        // --- Yearly Bar Chart Section ---
+        JPanel yearlyHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        yearlyHeader.setBackground(WHITE);
+        yearlyHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel yearlyTitle = new JLabel("Yearly Trend");
+        yearlyTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        yearlyTitle.setForeground(PRIMARY_BLUE);
+        yearlyHeader.add(yearlyTitle);
+        yearlyHeader.add(Box.createRigidArea(new Dimension(20, 0)));
+
+        SpinnerNumberModel yearModel = new SpinnerNumberModel(YearMonth.now().getYear(), 2000, 2100, 1);
+        yearSpinner = new JSpinner(yearModel);
+        yearSpinner.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        yearSpinner.addChangeListener(e -> refreshYearlyChart());
+        yearlyHeader.add(new JLabel("Year: "));
+        yearlyHeader.add(yearSpinner);
+        content.add(yearlyHeader);
+        content.add(Box.createRigidArea(new Dimension(0, 10)));
+
+        yearlyBarChart = new YearlyExpenseBarChart();
+        yearlyBarChart.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(yearlyBarChart);
+        content.add(Box.createRigidArea(new Dimension(0, 20)));
+
         JPanel statsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 30, 10));
         statsPanel.setBackground(WHITE);
         statsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -366,6 +392,15 @@ public class FinancePanel extends JPanel {
                 categoryTotals.put(t.category, categoryTotals.getOrDefault(t.category, 0.0) + t.amount);
             }
             pieChartPanel.setData(categoryTotals);
+        }
+        refreshYearlyChart();
+    }
+
+    private void refreshYearlyChart() {
+        if (yearlyBarChart != null && yearSpinner != null) {
+            int year = (Integer) yearSpinner.getValue();
+            List<Transaction> all = db.getTransactions(userId);
+            yearlyBarChart.setData(all, year);
         }
     }
 

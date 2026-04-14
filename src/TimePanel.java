@@ -4,7 +4,6 @@ import java.awt.event.*;
 import java.time.*;
 import java.util.*;
 import java.util.List;
-import java.util.Date;
 
 public class TimePanel extends JPanel {
 
@@ -142,48 +141,55 @@ public class TimePanel extends JPanel {
     }
 
     private JPanel buildTopBar() {
-        JPanel top = new JPanel(new BorderLayout());
-        top.setBackground(Color.WHITE);
-        top.setBorder(BorderFactory.createEmptyBorder(10,20,10,20));
+    JPanel top = new JPanel(new BorderLayout());
+    top.setBackground(Color.WHITE);
+    top.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-        JButton prev = new JButton("<");
-        JButton next = new JButton(">");
+    JButton prev = new JButton("<");
+    JButton next = new JButton(">");
 
-        styleTopButton(prev);
-        styleTopButton(next);
+    styleTopButton(prev);
+    styleTopButton(next);
 
-        monthLabel = new JLabel("", SwingConstants.CENTER);
-        monthLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
+    monthLabel = new JLabel("", SwingConstants.CENTER);
+    monthLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
+    
+    // --- KEY FIX: Set a fixed width so the buttons don't move ---
+    // 250 pixels is usually wide enough for "September 2026"
+    monthLabel.setPreferredSize(new Dimension(250, 40)); 
 
-        JPanel center = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        center.setBackground(Color.WHITE);
-        center.add(prev);
-        center.add(monthLabel);
-        center.add(next);
+    // Use a JPanel with FlowLayout to keep the items grouped together
+    JPanel navGroup = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+    navGroup.setBackground(Color.WHITE);
+    navGroup.add(prev);
+    navGroup.add(monthLabel);
+    navGroup.add(next);
 
-        JButton create = new JButton("+ Create");
-        create.setBackground(new Color(66,133,244));
-        create.setForeground(Color.WHITE);
-        create.setFocusPainted(false);
-        create.setOpaque(true); 
-        create.setBorderPainted(false); 
-        create.setBorder(BorderFactory.createEmptyBorder(8,16,8,16));
-        create.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        
-        create.addActionListener(e -> openTaskDialog(null));
+    // Keep the "Create" button on the far right
+    JButton create = new JButton("+ Create");
+    create.setBackground(new Color(66, 133, 244));
+    create.setForeground(Color.WHITE);
+    create.setFocusPainted(false);
+    create.setOpaque(true); 
+    create.setBorderPainted(false); 
+    create.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
+    create.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    
+    create.addActionListener(e -> openTaskDialog(null));
 
-        JPanel right = new JPanel();
-        right.setBackground(Color.WHITE);
-        right.add(create);
+    JPanel right = new JPanel();
+    right.setBackground(Color.WHITE);
+    right.add(create);
 
-        prev.addActionListener(e -> { currentMonth = currentMonth.minusMonths(1); loadCalendar(); });
-        next.addActionListener(e -> { currentMonth = currentMonth.plusMonths(1); loadCalendar(); });
+    prev.addActionListener(e -> { currentMonth = currentMonth.minusMonths(1); loadCalendar(); });
+    next.addActionListener(e -> { currentMonth = currentMonth.plusMonths(1); loadCalendar(); });
 
-        top.add(center, BorderLayout.CENTER);
-        top.add(right, BorderLayout.EAST);
+    // Add the stable navigation group to the center
+    top.add(navGroup, BorderLayout.CENTER);
+    top.add(right, BorderLayout.EAST);
 
-        return top;
-    }
+    return top;
+}
 
     private void styleTopButton(JButton btn) {
         btn.setFocusPainted(false);
