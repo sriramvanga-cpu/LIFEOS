@@ -30,8 +30,13 @@ public class FinancePanel extends JPanel {
     private JPanel accountsListPanel;
     private JTabbedPane tabbedPane;
     private PieChartPanel pieChartPanel;
-    private YearlyExpenseBarChart yearlyBarChart;
+    private HorizontalStackedBarChart yearlyBarChart;
     private JSpinner yearSpinner;
+
+    // Cache for transactions to avoid repeated DB queries
+    private List<Transaction> cachedTransactions;
+    private int lastFetchedYear = -1;
+    private int lastFetchedMonth = -1;
 
     public FinancePanel(int userId) {
         this.userId = userId;
@@ -54,17 +59,27 @@ public class FinancePanel extends JPanel {
 
         add(tabbedPane, BorderLayout.CENTER);
 
+        // Refresh data when tab changes, but reuse cached transactions if possible
         tabbedPane.addChangeListener(e -> {
-            if (tabbedPane.getSelectedIndex() == 0) {
-                refreshRecordsTab();
-            } else if (tabbedPane.getSelectedIndex() == 1) {
-                refreshAnalysisTab();
-            } else if (tabbedPane.getSelectedIndex() == 2) {
-                refreshAccountsList();
-            }
+            int idx = tabbedPane.getSelectedIndex();
+            if (idx == 0) refreshRecordsTab();
+            else if (idx == 1) refreshAnalysisTab();
+            else if (idx == 2) refreshAccountsList();
         });
     }
 
+    // ---------- Helper to load transactions only once per month/year change ----------
+    private void ensureTransactionsLoaded() {
+        int currentYear = currentMonth.getYear();
+        int currentMonthValue = currentMonth.getMonthValue();
+        if (cachedTransactions == null || lastFetchedYear != currentYear || lastFetchedMonth != currentMonthValue) {
+            cachedTransactions = db.getTransactions(userId);
+            lastFetchedYear = currentYear;
+            lastFetchedMonth = currentMonthValue;
+        }
+    }
+
+    // ---------- Month Navigation ----------
     private JPanel buildMonthNavigationBar() {
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(WHITE);
@@ -82,11 +97,14 @@ public class FinancePanel extends JPanel {
         prevBtn.addActionListener(e -> {
             currentMonth = currentMonth.minusMonths(1);
             updateMonthLabel();
+            // Invalidate cache when month changes
+            cachedTransactions = null;
             refreshAllData();
         });
         nextBtn.addActionListener(e -> {
             currentMonth = currentMonth.plusMonths(1);
             updateMonthLabel();
+            cachedTransactions = null;
             refreshAllData();
         });
 
@@ -113,11 +131,13 @@ public class FinancePanel extends JPanel {
     }
 
     public void refreshAllData() {
+        ensureTransactionsLoaded();
         refreshRecordsTab();
         refreshAnalysisTab();
         refreshAccountsList();
     }
 
+    // ---------- Records Tab ----------
     private JPanel buildRecordsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(WHITE);
@@ -147,20 +167,16 @@ public class FinancePanel extends JPanel {
         addBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
         addBtn.setBackground(PRIMARY_BLUE);
         addBtn.setForeground(WHITE);
-        
-        //   MAC COMPATIBILITY  
         addBtn.setOpaque(true);
         addBtn.setBorderPainted(false);
-        //         -
-
         addBtn.setFocusPainted(false);
         addBtn.setPreferredSize(new Dimension(400, 50));
         addBtn.addActionListener(e -> {
             JFrame parentFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
             new AddTransactionDialog(parentFrame, userId, () -> {
-                refreshRecordsTab();
-                refreshAccountsList();
-                refreshAnalysisTab();
+                // Invalidate cache after adding a transaction
+                cachedTransactions = null;
+                refreshAllData();
             }).setVisible(true);
         });
 
@@ -171,25 +187,32 @@ public class FinancePanel extends JPanel {
 
     private void refreshRecordsTab() {
         recordsListPanel.removeAll();
-        List<Transaction> transactions = db.getTransactions(userId);
+        ensureTransactionsLoaded();
 
         LocalDate monthStart = currentMonth.atDay(1);
         LocalDate monthEnd = currentMonth.atEndOfMonth();
         List<Transaction> monthTransactions = new ArrayList<>();
-        for (Transaction t : transactions) {
-            LocalDate transDate = (t.transTime != null) ? t.transTime.toLocalDateTime().toLocalDate() : (t.transDate != null ? t.transDate.toLocalDate() : null);
-            if (transDate != null && !transDate.isBefore(monthStart) && !transDate.isAfter(monthEnd)) {
-                monthTransactions.add(t);
-            }
-        }
-
         double totalIncome = 0;
         double totalExpense = 0;
 
+        for (Transaction t : cachedTransactions) {
+            LocalDate transDate = (t.transTime != null) ? t.transTime.toLocalDateTime().toLocalDate() : (t.transDate != null ? t.transDate.toLocalDate() : null);
+            if (transDate != null && !transDate.isBefore(monthStart) && !transDate.isAfter(monthEnd)) {
+                monthTransactions.add(t);
+                if ("EXPENSE".equalsIgnoreCase(t.type)) totalExpense += t.amount;
+                else if ("INCOME".equalsIgnoreCase(t.type)) totalIncome += t.amount;
+            }
+        }
+
+        // Sort by date descending (newest first)
+        monthTransactions.sort((a, b) -> {
+            LocalDate da = (a.transTime != null) ? a.transTime.toLocalDateTime().toLocalDate() : a.transDate.toLocalDate();
+            LocalDate db = (b.transTime != null) ? b.transTime.toLocalDateTime().toLocalDate() : b.transDate.toLocalDate();
+            return db.compareTo(da);
+        });
+
         for (Transaction t : monthTransactions) {
             recordsListPanel.add(createTransactionRow(t));
-            if ("EXPENSE".equalsIgnoreCase(t.type)) totalExpense += t.amount;
-            else if ("INCOME".equalsIgnoreCase(t.type)) totalIncome += t.amount;
         }
 
         expenseVal.setText("₹" + String.format("%.2f", totalExpense));
@@ -260,7 +283,10 @@ public class FinancePanel extends JPanel {
         deleteBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         deleteBtn.addActionListener(e -> {
             if (JOptionPane.showConfirmDialog(this, "Delete transaction?", "Confirm", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-                if (db.deleteTransaction(t.id)) { refreshRecordsTab(); refreshAccountsList(); refreshAnalysisTab(); }
+                if (db.deleteTransaction(t.id)) {
+                    cachedTransactions = null; // invalidate cache
+                    refreshAllData();
+                }
             }
         });
 
@@ -277,6 +303,7 @@ public class FinancePanel extends JPanel {
         return "Unknown";
     }
 
+    // ---------- Analysis Tab (Pie + Horizontal Stacked Bar) ----------
     private JPanel buildAnalysisPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(WHITE);
@@ -286,21 +313,23 @@ public class FinancePanel extends JPanel {
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBackground(WHITE);
 
-        JLabel title = new JLabel("Expense Breakdown");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        title.setForeground(PRIMARY_BLUE);
-        content.add(title);
+        // Pie chart section
+        JLabel pieTitle = new JLabel("Expense Breakdown");
+        pieTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        pieTitle.setForeground(PRIMARY_BLUE);
+        content.add(pieTitle);
         content.add(Box.createRigidArea(new Dimension(0, 20)));
 
         pieChartPanel = new PieChartPanel();
-        pieChartPanel.setPreferredSize(new Dimension(500, 400));
+        pieChartPanel.setPreferredSize(new Dimension(600, 500)); // Larger, centered later
         pieChartPanel.setBackground(WHITE);
         content.add(pieChartPanel);
-        content.add(Box.createRigidArea(new Dimension(0, 20)));
+        content.add(Box.createRigidArea(new Dimension(0, 30)));
 
+        // Horizontal stacked bar chart section
         JPanel yearlyHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         yearlyHeader.setBackground(WHITE);
-        JLabel yearlyTitle = new JLabel("Yearly Trend");
+        JLabel yearlyTitle = new JLabel("Monthly Expenses by Category");
         yearlyTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         yearlyTitle.setForeground(PRIMARY_BLUE);
         yearlyHeader.add(yearlyTitle);
@@ -313,7 +342,9 @@ public class FinancePanel extends JPanel {
         content.add(yearlyHeader);
         content.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        yearlyBarChart = new YearlyExpenseBarChart();
+        yearlyBarChart = new HorizontalStackedBarChart();
+        yearlyBarChart.setPreferredSize(new Dimension(900, 450));
+        yearlyBarChart.setBackground(WHITE);
         content.add(yearlyBarChart);
 
         panel.add(content, BorderLayout.NORTH);
@@ -321,12 +352,12 @@ public class FinancePanel extends JPanel {
     }
 
     private void refreshAnalysisTab() {
+        ensureTransactionsLoaded();
         if (pieChartPanel != null) {
-            List<Transaction> all = db.getTransactions(userId);
             LocalDate monthStart = currentMonth.atDay(1);
             LocalDate monthEnd = currentMonth.atEndOfMonth();
             Map<String, Double> categoryTotals = new HashMap<>();
-            for (Transaction t : all) {
+            for (Transaction t : cachedTransactions) {
                 if (!"EXPENSE".equals(t.type)) continue;
                 LocalDate d = (t.transTime != null) ? t.transTime.toLocalDateTime().toLocalDate() : (t.transDate != null ? t.transDate.toLocalDate() : null);
                 if (d != null && !d.isBefore(monthStart) && !d.isAfter(monthEnd)) {
@@ -339,32 +370,245 @@ public class FinancePanel extends JPanel {
     }
 
     private void refreshYearlyChart() {
-        if (yearlyBarChart != null && yearSpinner != null) {
-            yearlyBarChart.setData(db.getTransactions(userId), (Integer) yearSpinner.getValue());
+        if (yearlyBarChart != null && yearSpinner != null && cachedTransactions != null) {
+            yearlyBarChart.setData(cachedTransactions, (Integer) yearSpinner.getValue());
         }
     }
 
+    // ---------- IMPROVED PIE CHART (Larger, centered, readable labels) ----------
+    // ---------- FIXED PIE CHART (Centered labels, correct math) ----------
     private class PieChartPanel extends JPanel {
         private Map<String, Double> data = new HashMap<>();
-        private final Color[] COLORS = { new Color(66, 133, 244), new Color(219, 68, 55), new Color(244, 180, 0), new Color(15, 157, 88), new Color(171, 71, 188) };
+        private final Color[] COLORS = {
+                new Color(66, 133, 244), new Color(219, 68, 55), new Color(244, 180, 0),
+                new Color(15, 157, 88), new Color(171, 71, 188), new Color(255, 87, 34),
+                new Color(0, 172, 193), new Color(158, 158, 158)
+        };
+
         public void setData(Map<String, Double> data) { this.data = data; repaint(); }
-        @Override protected void paintComponent(Graphics g) {
+
+        @Override
+        protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (data.isEmpty()) return;
-            Graphics2D g2 = (Graphics2D) g; g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int size = Math.min(getWidth(), getHeight()) - 100;
-            int x = (getWidth() - size) / 2, y = (getHeight() - size) / 2;
-            double total = data.values().stream().mapToDouble(Double::doubleValue).sum(), startAngle = 0.0;
+            if (data == null || data.isEmpty()) {
+                g.setColor(Color.GRAY);
+                g.drawString("No data for this month", getWidth()/2 - 60, getHeight()/2);
+                return;
+            }
+
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // layout math
+            int padding = 60;
+            int pieSize = Math.min(getWidth() - 250, getHeight() - padding * 2);
+            int pieX = (getWidth() - 200 - pieSize) / 2 + 20; 
+            int pieY = (getHeight() - pieSize) / 2;
+
+            double total = data.values().stream().mapToDouble(Double::doubleValue).sum();
+            double startAngle = 0.0;
             int colorIndex = 0;
+
+            // 1. Draw the actual slices
             for (Map.Entry<String, Double> entry : data.entrySet()) {
                 double angle = (entry.getValue() / total) * 360.0;
                 g2.setColor(COLORS[colorIndex++ % COLORS.length]);
-                g2.fill(new Arc2D.Double(x, y, size, size, startAngle, angle, Arc2D.PIE));
+                g2.fill(new Arc2D.Double(pieX, pieY, pieSize, pieSize, startAngle, angle, Arc2D.PIE));
                 startAngle += angle;
+            }
+
+            // 2. Draw labels inside the slices
+            startAngle = 0.0;
+            colorIndex = 0;
+            g2.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            FontMetrics fm = g2.getFontMetrics();
+            
+            double radius = pieSize / 2.0;
+            double centerX = pieX + radius;
+            double centerY = pieY + radius;
+
+            for (Map.Entry<String, Double> entry : data.entrySet()) {
+                double angle = (entry.getValue() / total) * 360.0;
+                
+                // only draw labels for slices big enough to fit them ( > 4% )
+                if (angle > 15) {
+                    double midAngleDegrees = startAngle + (angle / 2.0);
+                    double midAngleRad = Math.toRadians(midAngleDegrees);
+
+                    // use radius * 0.65 to put the text inside the slice
+                    int lx = (int) (centerX + (radius * 0.65) * Math.cos(midAngleRad));
+                    int ly = (int) (centerY - (radius * 0.65) * Math.sin(midAngleRad));
+
+                    String percent = String.format("%.1f%%", (entry.getValue() / total) * 100);
+                    int tw = fm.stringWidth(percent);
+                    int th = fm.getAscent();
+
+                    // simple clean shadow for readability
+                    g2.setColor(new Color(0, 0, 0, 150));
+                    g2.drawString(percent, lx - tw/2 + 1, ly + th/2 + 1);
+                    g2.setColor(Color.WHITE);
+                    g2.drawString(percent, lx - tw/2, ly + th/2);
+                }
+                startAngle += angle;
+            }
+
+            // 3. Legend on the right
+            int legendX = pieX + pieSize + 40;
+            int legendY = pieY + 30;
+            g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            colorIndex = 0;
+            for (Map.Entry<String, Double> entry : data.entrySet()) {
+                g2.setColor(COLORS[colorIndex % COLORS.length]);
+                g2.fillRect(legendX, legendY, 14, 14);
+                g2.setColor(Color.DARK_GRAY);
+                String label = String.format("%s (₹%.0f)", entry.getKey(), entry.getValue());
+                g2.drawString(label, legendX + 22, legendY + 12);
+                legendY += 25;
+                colorIndex++;
             }
         }
     }
 
+    // ---------- HORIZONTAL STACKED BAR CHART (optimised, uses cached transactions) ----------
+    private class HorizontalStackedBarChart extends JPanel {
+        private Map<Integer, Map<String, Double>> monthlyCategoryData = new LinkedHashMap<>();
+        private Map<String, Color> categoryColors = new HashMap<>();
+        private double maxTotal = 0;
+        private int selectedYear;
+
+        public HorizontalStackedBarChart() {
+            setBackground(WHITE);
+        }
+
+        public void setData(List<Transaction> transactions, int year) {
+            this.selectedYear = year;
+            monthlyCategoryData.clear();
+            categoryColors.clear();
+
+            // Prepare data: month -> category -> amount
+            for (int m = 1; m <= 12; m++) {
+                monthlyCategoryData.put(m, new HashMap<>());
+            }
+
+            for (Transaction t : transactions) {
+                if (!"EXPENSE".equals(t.type)) continue;
+                LocalDate d = (t.transTime != null) ? t.transTime.toLocalDateTime().toLocalDate() :
+                        (t.transDate != null ? t.transDate.toLocalDate() : null);
+                if (d != null && d.getYear() == year) {
+                    int month = d.getMonthValue();
+                    Map<String, Double> catMap = monthlyCategoryData.get(month);
+                    catMap.merge(t.category, t.amount, Double::sum);
+                }
+            }
+
+            // Assign consistent colors to categories
+            Set<String> allCategories = new HashSet<>();
+            for (Map<String, Double> catMap : monthlyCategoryData.values()) {
+                allCategories.addAll(catMap.keySet());
+            }
+            Color[] preset = { new Color(66,133,244), new Color(219,68,55), new Color(244,180,0),
+                    new Color(15,157,88), new Color(171,71,188), new Color(255,87,34),
+                    new Color(0,172,193), new Color(158,158,158) };
+            int idx = 0;
+            for (String cat : allCategories) {
+                categoryColors.put(cat, preset[idx % preset.length]);
+                idx++;
+            }
+
+            // Find max total for scaling
+            maxTotal = 0;
+            for (int m = 1; m <= 12; m++) {
+                double total = monthlyCategoryData.get(m).values().stream().mapToDouble(Double::doubleValue).sum();
+                if (total > maxTotal) maxTotal = total;
+            }
+            if (maxTotal <= 0) maxTotal = 1.0;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int width = getWidth();
+            int height = getHeight();
+            int paddingLeft = 70;
+            int paddingRight = 180;
+            int paddingTop = 40;
+            int paddingBottom = 30;
+            int chartWidth = width - paddingLeft - paddingRight;
+            int barHeight = (height - paddingTop - paddingBottom) / 12;
+            int barSpacing = 5;
+
+            // Title
+            g2.setColor(Color.DARK_GRAY);
+            g2.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            String title = "Monthly Expenses by Category – " + selectedYear;
+            FontMetrics fm = g2.getFontMetrics();
+            g2.drawString(title, (width - fm.stringWidth(title)) / 2, paddingTop - 10);
+
+            // Y-axis labels (months)
+            g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            fm = g2.getFontMetrics();
+            DateTimeFormatter monthFormat = DateTimeFormatter.ofPattern("MMM");
+            for (int month = 1; month <= 12; month++) {
+                int y = paddingTop + (month-1) * (barHeight + barSpacing) + barHeight/2 + 5;
+                String monthName = YearMonth.of(selectedYear, month).format(monthFormat);
+                g2.setColor(Color.DARK_GRAY);
+                g2.drawString(monthName, paddingLeft - fm.stringWidth(monthName) - 10, y);
+            }
+
+            // Draw bars
+            for (int month = 1; month <= 12; month++) {
+                int y = paddingTop + (month-1) * (barHeight + barSpacing);
+                Map<String, Double> catMap = monthlyCategoryData.get(month);
+                double total = catMap.values().stream().mapToDouble(Double::doubleValue).sum();
+                double x = paddingLeft;
+                for (Map.Entry<String, Double> entry : catMap.entrySet()) {
+                    double amount = entry.getValue();
+                    int segmentWidth = (int)((amount / maxTotal) * chartWidth);
+                    if (segmentWidth < 1) continue;
+                    g2.setColor(categoryColors.get(entry.getKey()));
+                    g2.fillRect((int)x, y, segmentWidth, barHeight);
+                    // Label inside segment if wide enough
+                    if (segmentWidth > 40) {
+                        double percent = (amount / total) * 100;
+                        String label = String.format("%s %.0f%%", entry.getKey(), percent);
+                        g2.setColor(Color.WHITE);
+                        g2.setFont(new Font("Segoe UI", Font.BOLD, 10));
+                        g2.drawString(label, (int)x + 5, y + barHeight - 5);
+                    } else if (segmentWidth > 20) {
+                        double percent = (amount / total) * 100;
+                        String pct = String.format("%.0f%%", percent);
+                        g2.setColor(Color.WHITE);
+                        g2.setFont(new Font("Segoe UI", Font.BOLD, 9));
+                        g2.drawString(pct, (int)x + 3, y + barHeight - 5);
+                    }
+                    x += segmentWidth;
+                }
+                // Total value at end of bar
+                g2.setColor(Color.DARK_GRAY);
+                g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+                g2.drawString(String.format("₹%.0f", total), (int)x + 5, y + barHeight - 5);
+            }
+
+            // Legend on the right
+            int legendX = width - paddingRight + 10;
+            int legendY = paddingTop + 20;
+            g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            for (Map.Entry<String, Color> entry : categoryColors.entrySet()) {
+                g2.setColor(entry.getValue());
+                g2.fillRect(legendX, legendY, 15, 15);
+                g2.setColor(Color.DARK_GRAY);
+                g2.drawString(entry.getKey(), legendX + 20, legendY + 12);
+                legendY += 25;
+            }
+            g2.dispose();
+        }
+    }
+
+    // ---------- Accounts Tab (with Delete button) ----------
     private JPanel buildAccountsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(WHITE);
@@ -380,12 +624,8 @@ public class FinancePanel extends JPanel {
         JButton addAccountBtn = new JButton("+ Add Account");
         addAccountBtn.setBackground(PRIMARY_BLUE);
         addAccountBtn.setForeground(WHITE);
-        
-        //   MAC COMPATIBILITY  
         addAccountBtn.setOpaque(true);
         addAccountBtn.setBorderPainted(false);
-        //         -
-
         addAccountBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         addAccountBtn.addActionListener(e -> openAccountDialog(null));
         header.add(addAccountBtn, BorderLayout.EAST);
@@ -420,7 +660,7 @@ public class FinancePanel extends JPanel {
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(230, 230, 230), 1, true),
                 new EmptyBorder(15, 20, 15, 20)));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120)); // Taller for progress bar
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
 
         JPanel left = new JPanel();
         left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
@@ -433,18 +673,14 @@ public class FinancePanel extends JPanel {
         left.add(nameLabel);
         left.add(typeLabel);
 
-        //   BUDGETING PROGRESS BAR  
-        // This assumes you added the 'budget' field to the Account class
         if (acc.budget > 0) {
             left.add(Box.createRigidArea(new Dimension(0, 10)));
             JProgressBar budgetBar = new JProgressBar(0, (int)acc.budget);
             budgetBar.setValue((int)Math.abs(acc.balance));
             budgetBar.setForeground(acc.balance > acc.budget ? EXPENSE_RED : INCOME_GREEN);
             budgetBar.setPreferredSize(new Dimension(150, 8));
-            
             JLabel budgetLabel = new JLabel(String.format("Budget: ₹%.2f / ₹%.2f", Math.abs(acc.balance), acc.budget));
             budgetLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-            
             left.add(budgetBar);
             left.add(budgetLabel);
         }
@@ -460,108 +696,128 @@ public class FinancePanel extends JPanel {
         editBtn.setContentAreaFilled(false);
         editBtn.addActionListener(e -> openAccountDialog(acc));
 
+        JButton deleteBtn = new JButton("Delete");
+        deleteBtn.setForeground(EXPENSE_RED);
+        deleteBtn.setContentAreaFilled(false);
+        deleteBtn.addActionListener(e -> deleteAccount(acc));
+
         right.add(balanceLabel);
         right.add(editBtn);
+        right.add(deleteBtn);
 
         card.add(left, BorderLayout.WEST);
         card.add(right, BorderLayout.EAST);
         return card;
     }
 
-    private void openAccountDialog(Account existing) {
-    boolean isEdit = existing != null;
-    JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), 
-            isEdit ? "Edit Account" : "Add Account", true);
-    dialog.setSize(400, 380); // Increased height for the budget field
-    dialog.setLocationRelativeTo(this);
-    dialog.setLayout(new BorderLayout());
-
-    JPanel form = new JPanel(new GridBagLayout());
-    form.setBackground(WHITE);
-    form.setBorder(new EmptyBorder(20, 20, 20, 20));
-    GridBagConstraints gbc = new GridBagConstraints();
-    gbc.fill = GridBagConstraints.HORIZONTAL;
-    gbc.insets = new Insets(8, 5, 8, 5);
-    gbc.weightx = 1.0;
-
-    //   Name Field  
-    gbc.gridy = 0; gbc.gridx = 0; gbc.weightx = 0.3;
-    form.add(new JLabel("Name:"), gbc);
-    JTextField nameField = new JTextField(isEdit ? existing.name : "");
-    gbc.gridx = 1; gbc.weightx = 0.7;
-    form.add(nameField, gbc);
-
-    //   Type Field  
-    gbc.gridy = 1; gbc.gridx = 0; gbc.weightx = 0.3;
-    form.add(new JLabel("Type:"), gbc);
-    String[] types = {"Cash", "Bank", "Credit Card", "Savings", "Investment", "Other"};
-    JComboBox<String> typeBox = new JComboBox<>(types);
-    if (isEdit) {
-        typeBox.setSelectedItem(existing.type.replace('_', ' '));
-    }
-    gbc.gridx = 1; gbc.weightx = 0.7;
-    form.add(typeBox, gbc);
-
-    //   Balance Field  
-    gbc.gridy = 2; gbc.gridx = 0; gbc.weightx = 0.3;
-    form.add(new JLabel("Initial Balance:"), gbc);
-    JSpinner balanceSpinner = new JSpinner(new SpinnerNumberModel(
-            isEdit ? existing.balance : 0.0, -1000000.0, 1000000.0, 100.0));
-    gbc.gridx = 1; gbc.weightx = 0.7;
-    form.add(balanceSpinner, gbc);
-
-    //   NEW: BUDGET FIELD  
-    gbc.gridy = 3; gbc.gridx = 0; gbc.weightx = 0.3;
-    form.add(new JLabel("Monthly Budget:"), gbc);
-    JSpinner budgetSpinner = new JSpinner(new SpinnerNumberModel(
-            isEdit ? existing.budget : 0.0, 0.0, 1000000.0, 100.0));
-    gbc.gridx = 1; gbc.weightx = 0.7;
-    form.add(budgetSpinner, gbc);
-
-    //   Action Buttons  
-    JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    buttons.setBackground(WHITE);
-    JButton cancel = new JButton("Cancel");
-    cancel.addActionListener(e -> dialog.dispose());
-    
-    JButton save = new JButton(isEdit ? "Save" : "Add");
-    save.setBackground(PRIMARY_BLUE);
-    save.setForeground(WHITE);
-    save.setOpaque(true); 
-    save.setBorderPainted(false);
-    
-    save.addActionListener(e -> {
-        String name = nameField.getText().trim();
-        if (name.isEmpty()) {
-            JOptionPane.showMessageDialog(dialog, "Name is required.");
+    private void deleteAccount(Account acc) {
+        // Check if account has any transactions (expense, income, or transfer)
+        int count = db.getTransactionCountForAccount(acc.id);
+        if (count > 0) {
+            JOptionPane.showMessageDialog(this,
+                    "Cannot delete account '" + acc.name + "' because it has " + count + " transactions.\nPlease delete or move all transactions first.",
+                    "Account in use", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        
-        String type = ((String) typeBox.getSelectedItem()).toUpperCase().replace(' ', '_');
-        double bal = ((Number) balanceSpinner.getValue()).doubleValue();
-        double bud = ((Number) budgetSpinner.getValue()).doubleValue(); // Get the budget value
-
-        boolean success;
-        // UPDATED: Now passing 'bud' as the required extra argument
-        if (isEdit) {
-            success = accountDAO.updateAccount(existing.id, name, type, bud);
-        } else {
-            success = accountDAO.addAccount(userId, name, type, bal, bud);
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Delete account '" + acc.name + "'? This action cannot be undone.",
+                "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            if (accountDAO.deleteAccount(acc.id)) {
+                refreshAccountsList();
+                // Also invalidate transaction cache because any linked transactions would have been prevented anyway
+            } else {
+                JOptionPane.showMessageDialog(this, "Failed to delete account.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
+    }
 
-        if (success) {
-            refreshAccountsList();
-            dialog.dispose();
-        } else {
-            JOptionPane.showMessageDialog(dialog, "Operation failed.");
-        }
-    });
-    
-    buttons.add(cancel);
-    buttons.add(save);
+    private void openAccountDialog(Account existing) {
+        boolean isEdit = existing != null;
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+                isEdit ? "Edit Account" : "Add Account", true);
+        dialog.setSize(400, 380);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
 
-    dialog.add(form, BorderLayout.CENTER);
-    dialog.add(buttons, BorderLayout.SOUTH);
-    dialog.setVisible(true);
-}
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBackground(WHITE);
+        form.setBorder(new EmptyBorder(20, 20, 20, 20));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(8, 5, 8, 5);
+        gbc.weightx = 1.0;
+
+        gbc.gridy = 0; gbc.gridx = 0; gbc.weightx = 0.3;
+        form.add(new JLabel("Name:"), gbc);
+        JTextField nameField = new JTextField(isEdit ? existing.name : "");
+        gbc.gridx = 1; gbc.weightx = 0.7;
+        form.add(nameField, gbc);
+
+        gbc.gridy = 1; gbc.gridx = 0; gbc.weightx = 0.3;
+        form.add(new JLabel("Type:"), gbc);
+        String[] types = {"Cash", "Bank", "Credit Card", "Savings", "Investment", "Other"};
+        JComboBox<String> typeBox = new JComboBox<>(types);
+        if (isEdit) typeBox.setSelectedItem(existing.type.replace('_', ' '));
+        gbc.gridx = 1; gbc.weightx = 0.7;
+        form.add(typeBox, gbc);
+
+        gbc.gridy = 2; gbc.gridx = 0; gbc.weightx = 0.3;
+        form.add(new JLabel("Initial Balance:"), gbc);
+        JSpinner balanceSpinner = new JSpinner(new SpinnerNumberModel(
+                isEdit ? existing.balance : 0.0, -1000000.0, 1000000.0, 100.0));
+        gbc.gridx = 1; gbc.weightx = 0.7;
+        form.add(balanceSpinner, gbc);
+
+        gbc.gridy = 3; gbc.gridx = 0; gbc.weightx = 0.3;
+        form.add(new JLabel("Monthly Budget:"), gbc);
+        JSpinner budgetSpinner = new JSpinner(new SpinnerNumberModel(
+                isEdit ? existing.budget : 0.0, 0.0, 1000000.0, 100.0));
+        gbc.gridx = 1; gbc.weightx = 0.7;
+        form.add(budgetSpinner, gbc);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttons.setBackground(WHITE);
+        JButton cancel = new JButton("Cancel");
+        cancel.addActionListener(e -> dialog.dispose());
+
+        JButton save = new JButton(isEdit ? "Save" : "Add");
+        save.setBackground(PRIMARY_BLUE);
+        save.setForeground(WHITE);
+        save.setOpaque(true);
+        save.setBorderPainted(false);
+
+        save.addActionListener(e -> {
+            String name = nameField.getText().trim();
+            if (name.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Name is required.");
+                return;
+            }
+            String type = ((String) typeBox.getSelectedItem()).toUpperCase().replace(' ', '_');
+            double bal = ((Number) balanceSpinner.getValue()).doubleValue();
+            double bud = ((Number) budgetSpinner.getValue()).doubleValue();
+
+            boolean success;
+            if (isEdit) {
+                success = accountDAO.updateAccount(existing.id, name, type, bud);
+                if (success && Math.abs(bal - existing.balance) > 0.01) {
+                    accountDAO.updateBalance(existing.id, bal - existing.balance, bal > existing.balance);
+                }
+            } else {
+                success = accountDAO.addAccount(userId, name, type, bal, bud);
+            }
+            if (success) {
+                refreshAccountsList();
+                dialog.dispose();
+            } else {
+                JOptionPane.showMessageDialog(dialog, "Operation failed.");
+            }
+        });
+
+        buttons.add(cancel);
+        buttons.add(save);
+        dialog.add(form, BorderLayout.CENTER);
+        dialog.add(buttons, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
 }

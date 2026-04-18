@@ -1,4 +1,7 @@
 import javax.swing.*;
+
+import org.w3c.dom.events.MouseEvent;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.time.*;
@@ -265,161 +268,141 @@ public class TimePanel extends JPanel {
     }
 
     private void showEvents(int day) {
-        selectedDay = day;
-        dayViewPanel.removeAll();
+    selectedDay = day;
+    dayViewPanel.removeAll();
 
-        LocalDate date = currentMonth.atDay(day);
-        List<Task> tasks = monthCache.getOrDefault(date, new ArrayList<>());
+    LocalDate date = currentMonth.atDay(day);
+    List<Task> tasks = monthCache.getOrDefault(date, new ArrayList<>());
 
-        Map<Integer, List<Task>> hourMap = new HashMap<>();
-        for (Task t : tasks) {
-            int start = t.startHour * 60 + t.startMin;
-            int end = t.endHour * 60 + t.endMin;
-            for (int h = start / 60; h <= end / 60; h++) {
-                hourMap.computeIfAbsent(h, k -> new ArrayList<>()).add(t);
-            }
+    // map out which tasks belong in which hour slot
+    Map<Integer, List<Task>> hourMap = new HashMap<>();
+    for (Task t : tasks) {
+        int start = t.startHour * 60 + t.startMin;
+        int end = t.endHour * 60 + t.endMin;
+        
+        // fix: only add to the hour if it actually takes up time in that slot
+        for (int h = start / 60; h * 60 < end; h++) {
+            hourMap.computeIfAbsent(h, k -> new ArrayList<>()).add(t);
         }
+    }
 
-        Map<Integer, Integer> globalMaxSegment = new HashMap<>();
-        for (Task t : tasks) {
-            int taskStart = t.startHour * 60 + t.startMin;
-            int taskEnd = t.endHour * 60 + t.endMin;
+    // find the tallest segment of each task to place the label there
+    Map<Integer, Integer> globalMaxSegment = new HashMap<>();
+    for (Task t : tasks) {
+        int taskStart = t.startHour * 60 + t.startMin;
+        int taskEnd = t.endHour * 60 + t.endMin;
 
-            for (int h = taskStart / 60; h <= taskEnd / 60; h++) {
-                int slotStart = h * 60;
+        for (int h = taskStart / 60; h * 60 < taskEnd; h++) {
+            int slotStart = h * 60;
+            int startOffset = Math.max(0, taskStart - slotStart);
+            int endOffset = Math.min(60, taskEnd - slotStart);
+            globalMaxSegment.put(t.taskId, Math.max(globalMaxSegment.getOrDefault(t.taskId, 0), endOffset - startOffset));
+        }
+    }
+
+    Set<Integer> labelShown = new HashSet<>();
+    int slotHeight = 70;
+    double pixelsPerMinute = slotHeight / 60.0;
+    
+    for (int hour = 0; hour < 24; hour++) {
+        JPanel slot = new JPanel(null) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                int leftCol = 64;
+                g.setColor(new Color(245,247,250));
+                g.fillRect(0, 0, leftCol, getHeight());
+                g.setColor(new Color(220,220,220));
+                g.drawLine(leftCol, 0, leftCol, getHeight()); 
+                g.setColor(new Color(230,230,230)); 
+                g.drawLine(leftCol, getHeight() - 1, getWidth(), getHeight() - 1); 
+            }
+        };
+        slot.setPreferredSize(new Dimension(300, slotHeight));
+        slot.setMaximumSize(new Dimension(Integer.MAX_VALUE, slotHeight));
+        slot.setBackground(Color.WHITE);
+
+        JLabel timeLabel = new JLabel(String.format("%02d:00", hour));
+        timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        timeLabel.setForeground(new Color(120,120,120));
+        timeLabel.setBounds(8, (slotHeight - 18) / 2, 52, 18);
+        slot.add(timeLabel);
+
+        List<Task> active = hourMap.getOrDefault(hour, new ArrayList<>());
+        if (!active.isEmpty()) {
+            active.sort(Comparator.comparingInt(a -> a.startHour * 60 + a.startMin));
+
+            int totalWidth = dayViewPanel.getWidth();
+            if (totalWidth <= 0) totalWidth = dayViewPanel.getPreferredSize().width;
+            int leftOffset = 64;
+            int availableWidth = Math.max(totalWidth - leftOffset, 300);
+            
+            // split width equally among concurrent tasks in this hour
+            int cols = active.size();
+            int colWidth = availableWidth / cols;
+
+            for (int i = 0; i < active.size(); i++) {
+                Task t = active.get(i);
+                int taskStart = t.startHour * 60 + t.startMin;
+                int taskEnd = t.endHour * 60 + t.endMin;
+                int slotStart = hour * 60;
+                int slotEnd = slotStart + 60;
+
                 int startOffset = Math.max(0, taskStart - slotStart);
                 int endOffset = Math.min(60, taskEnd - slotStart);
-                globalMaxSegment.put(t.taskId, Math.max(globalMaxSegment.getOrDefault(t.taskId, 0), endOffset - startOffset));
+
+                int y = (int) Math.round(startOffset * pixelsPerMinute);
+                int height = (int) Math.round((endOffset - startOffset) * pixelsPerMinute);
+
+                // make sure tiny tasks are still clickable
+                if (t.startHour == hour && t.endHour == hour) {
+                    height = Math.max(height, 35);
+                    if (y + height > slotHeight) y = slotHeight - height;
+                }
+
+                JPanel cell = new JPanel(new BorderLayout());
+                cell.setBackground(getTaskColor(t));
+                cell.setCursor(new Cursor(Cursor.HAND_CURSOR)); 
+                cell.setBorder(BorderFactory.createMatteBorder(
+                    taskStart < slotStart ? 0 : 1, 1, taskEnd > slotEnd ? 0 : 1, 1, 
+                    new Color(255,255,255,80)
+                ));
+                
+                // extend the box slightly if it continues to the next slot to avoid gaps
+                int overlap = (taskEnd > slotEnd) ? 1 : 0;
+                cell.setBounds(leftOffset + i * colWidth + 6, y, colWidth - 12, height + overlap);
+
+                // only show the text label in the largest segment of the task
+                if (endOffset - startOffset == globalMaxSegment.get(t.taskId) && !labelShown.contains(t.taskId)) {
+                    labelShown.add(t.taskId);
+                    JLabel titleLbl = new JLabel(t.title);
+                    titleLbl.setForeground(Color.WHITE);
+                    titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+                    JLabel timeLbl = new JLabel(String.format("%02d:%02d-%02d:%02d", t.startHour, t.startMin, t.endHour, t.endMin));
+                    timeLbl.setForeground(new Color(255,255,255,200));
+                    timeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+
+                    JPanel textPanel = new JPanel();
+                    textPanel.setOpaque(false);
+                    textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+                    textPanel.setBorder(BorderFactory.createEmptyBorder(4, 5, 0, 0));
+                    textPanel.add(titleLbl);
+                    textPanel.add(timeLbl);
+                    cell.add(textPanel, BorderLayout.CENTER);
+                }
+
+                cell.addMouseListener(new MouseAdapter() {
+                    public void mouseClicked(MouseEvent e) { openTaskDialog(t); }
+                });
+                slot.add(cell);
             }
         }
-
-        Set<Integer> labelShown = new HashSet<>();
-        int slotHeight = 70;
-        
-        for (int hour = 0; hour < 24; hour++) {
-            JPanel slot = new JPanel(null) {
-                @Override
-                protected void paintComponent(Graphics g) {
-                    super.paintComponent(g);
-                    int leftCol = 64;
-                    g.setColor(new Color(245,247,250));
-                    g.fillRect(0, 0, leftCol, getHeight());
-                    
-                    g.setColor(new Color(220,220,220));
-                    g.drawLine(leftCol, 0, leftCol, getHeight()); 
-                    
-                    g.setColor(new Color(230,230,230)); 
-                    g.drawLine(leftCol, getHeight() - 1, getWidth(), getHeight() - 1); 
-                }
-            };
-            slot.setPreferredSize(new Dimension(300, slotHeight));
-            slot.setMaximumSize(new Dimension(Integer.MAX_VALUE, slotHeight));
-            slot.setBackground(Color.WHITE);
-
-            JLabel timeLabel = new JLabel(String.format("%02d:00", hour));
-            timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            timeLabel.setForeground(new Color(120,120,120));
-            timeLabel.setBounds(8, (slotHeight - 18) / 2, 52, 18);
-            timeLabel.setOpaque(false);
-            slot.add(timeLabel);
-
-            double pixelsPerMinute = slotHeight / 60.0;
-            List<Task> active = hourMap.getOrDefault(hour, new ArrayList<>());
-
-            if (!active.isEmpty()) {
-                active.sort(Comparator.comparingInt(a -> a.startHour * 60 + a.startMin));
-
-                int cols = active.size();
-                JPanel layer = new JPanel(null);
-                layer.setOpaque(false);
-
-                int totalWidth = dayViewPanel.getWidth();
-                if (totalWidth <= 0) totalWidth = dayViewPanel.getPreferredSize().width;
-                int leftOffset = 64;
-                int availableWidth = Math.max(totalWidth - leftOffset, 300);
-                int colWidth = availableWidth / Math.max(cols, 1);
-
-                for (int i = 0; i < active.size(); i++) {
-                    Task t = active.get(i);
-
-                    int taskStart = t.startHour * 60 + t.startMin;
-                    int taskEnd = t.endHour * 60 + t.endMin;
-                    int slotStart = hour * 60;
-                    int slotEnd = slotStart + 60;
-
-                    int startOffset = Math.max(0, taskStart - slotStart);
-                    int endOffset = Math.min(60, taskEnd - slotStart);
-
-                    int y = (int) Math.round(startOffset * pixelsPerMinute);
-                    int height = (int) Math.round((endOffset - startOffset) * pixelsPerMinute);
-
-                    if (t.startHour == hour && t.endHour == hour) {
-                        height = Math.max(height, 35);
-                        if (y + height > slotHeight) {
-                            y = slotHeight - height;
-                        }
-                    } else if (t.startHour == hour) {
-                        height = slotHeight - y;
-                    } else if (t.endHour == hour) {
-                        y = 0;
-                        height = (int) Math.round(endOffset * pixelsPerMinute);
-                    } else {
-                        y = 0;
-                        height = slotHeight;
-                    }
-
-                    Color c = getTaskColor(t);
-
-                    JPanel cell = new JPanel(new BorderLayout());
-                    cell.setOpaque(true);
-                    cell.setBackground(c);
-                    cell.setCursor(new Cursor(Cursor.HAND_CURSOR)); 
-                    
-                    int topBorder = (taskStart < slotStart) ? 0 : 1;
-                    int bottomBorder = (taskEnd > slotEnd) ? 0 : 1;
-                    
-                    cell.setBorder(BorderFactory.createMatteBorder(topBorder, 1, bottomBorder, 1, new Color(255,255,255,80)));
-                    
-                    int seamlessOverlap = (taskEnd > slotEnd) ? 1 : 0;
-                    cell.setBounds(leftOffset + i * colWidth + 6, y, colWidth - 12, height + seamlessOverlap);
-
-                    if (endOffset - startOffset == globalMaxSegment.get(t.taskId) && !labelShown.contains(t.taskId)) {
-                        labelShown.add(t.taskId);
-                        JLabel titleLbl = new JLabel(t.title);
-                        titleLbl.setForeground(Color.WHITE);
-                        titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
-
-                        JLabel timeLbl = new JLabel(String.format("%02d:%02d-%02d:%02d", t.startHour, t.startMin, t.endHour, t.endMin));
-                        timeLbl.setForeground(new Color(255,255,255,200));
-                        timeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-
-                        JPanel textPanel = new JPanel();
-                        textPanel.setOpaque(false);
-                        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-                        textPanel.setBorder(BorderFactory.createEmptyBorder(4,0,0,0));
-                        textPanel.add(titleLbl);
-                        textPanel.add(timeLbl);
-                        cell.add(textPanel, BorderLayout.CENTER);
-                    }
-
-                    cell.setToolTipText("<html><b>" + t.title + "</b><br>Click to View/Edit</html>");
-                    
-                    cell.addMouseListener(new MouseAdapter() {
-                        public void mouseClicked(MouseEvent e) {
-                            openTaskDialog(t); 
-                        }
-                    });
-                    layer.add(cell);
-                }
-                int width = slot.getWidth() == 0 ? slot.getPreferredSize().width : slot.getWidth();
-                layer.setBounds(0, 0, width, slotHeight);
-                slot.add(layer);
-            }
-            dayViewPanel.add(slot);
-        }
-        dayViewPanel.revalidate();
-        dayViewPanel.repaint();
+        dayViewPanel.add(slot);
     }
+    dayViewPanel.revalidate();
+    dayViewPanel.repaint();
+}
 
     private void openTaskDialog(Task existingTask) {
         if (selectedDay == -1) {

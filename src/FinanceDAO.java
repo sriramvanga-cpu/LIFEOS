@@ -172,4 +172,23 @@ public class FinanceDAO {
             try { conn.setAutoCommit(true); } catch (SQLException e) { e.printStackTrace(); }
         }
     }
+    /**
+     * Returns the number of transactions (expense, income, or transfer) that involve the given account.
+     * Used before deleting an account.
+     */
+    public int getTransactionCountForAccount(int accountId) {
+        String query = "SELECT COUNT(*) FROM TRANSACTIONS WHERE ACCOUNT_ID = ? OR TO_ACCOUNT_ID = ?";
+        Connection conn = DBConnection.getConnection();
+        if (conn == null) return 0;
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setInt(1, accountId);
+            ps.setInt(2, accountId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 }
