@@ -7,6 +7,7 @@ public class DashboardFrame extends JFrame {
     private JPanel mainPanel;
     private int currentUserId;
     private HealthPanel cachedHealthPanel;
+    private FinancePanel cachedFinancePanel;
 
     // We keep class-level references to the buttons so we can change their colors later
     private JButton timeBtn, healthBtn, financeBtn, profileBtn;
@@ -161,13 +162,20 @@ public class DashboardFrame extends JFrame {
     }
 
     private void showFinance() {
-
-        mainPanel.removeAll();
-        mainPanel.setLayout(new BorderLayout());
-        mainPanel.add(new FinancePanel(currentUserId), BorderLayout.CENTER);
-        
-        refresh();
+    mainPanel.removeAll();
+    mainPanel.setLayout(new BorderLayout());
+    
+    // Cache logic: Only create the panel if it doesn't exist yet
+    if (cachedFinancePanel == null) {
+        cachedFinancePanel = new FinancePanel(currentUserId);
+    } else {
+        // If it already exists, just refresh the data from the cloud
+        cachedFinancePanel.refreshAllData();
     }
+    
+    mainPanel.add(cachedFinancePanel, BorderLayout.CENTER);
+    refresh();
+}
 
     private void showProfile() {
         mainPanel.removeAll();

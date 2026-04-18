@@ -1,4 +1,7 @@
 import javax.swing.*;
+
+import org.w3c.dom.events.MouseEvent;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.sql.Date;
@@ -152,37 +155,69 @@ public class SignupFrame extends JFrame {
     }
 
     private void handleSignup() {
-        errorLabel.setText("");
+    // Reset error message at the start of every attempt
+    errorLabel.setText("");
 
-        String name = nameField.getText().trim();
-        String email = emailField.getText().trim();
-        String password = new String(passwordField.getPassword());
-        String dobText = dobField.getText().trim();
+    String name = nameField.getText().trim();
+    String email = emailField.getText().trim();
+    String password = new String(passwordField.getPassword());
+    String dobText = dobField.getText().trim();
 
-        if (name.isEmpty() || email.isEmpty() || password.isEmpty() || dobText.isEmpty()) {
-            errorLabel.setText("All fields are required");
-            return;
-        }
+    // 1. Basic Empty Field Validation
+    if (name.isEmpty() || email.isEmpty() || password.isEmpty() || dobText.isEmpty()) {
+        errorLabel.setText("All fields are required");
+        return;
+    }
 
-        Date dob;
-        try {
-            dob = Date.valueOf(dobText); // expects YYYY-MM-DD
-        } catch (Exception ex) {
-            errorLabel.setText("Invalid DOB format (YYYY-MM-DD)");
-            return;
-        }
+    // 2. Robust Email Validation (Regex)
+    // Ensures the email follows a standard "user@domain.com" pattern
+    String emailRegex = "^[A-Za-z0-9+_.-]+@(.+)$";
+    if (!email.matches(emailRegex)) {
+        errorLabel.setText("Please enter a valid email address");
+        return;
+    }
 
-        try {
-        // Call the updated DAO method
+    // 3. Password Strength Check
+    // Prevents weak passwords from being registered
+    if (password.length() < 6) {
+        errorLabel.setText("Password must be at least 6 characters");
+        return;
+    }
+
+    // 4. Date of Birth Format Validation
+    java.sql.Date dob;
+    try {
+        dob = java.sql.Date.valueOf(dobText); // expects YYYY-MM-DD
+    } catch (Exception ex) {
+        errorLabel.setText("Invalid DOB format (YYYY-MM-DD)");
+        return;
+    }
+
+    // 5. Database Registration with Detailed Error Feedback
+    try {
+        // Call the DAO to hash password and insert into Neon cloud
         dao.registerUser(name, email, password, dob); 
         
-        JOptionPane.showMessageDialog(this, "Account created successfully!", "Success", JOptionPane.PLAIN_MESSAGE);
+        // Success Message
+        JOptionPane.showMessageDialog(this, "Account created successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+        
+        // Transition back to Login screen
         setVisible(false);
-        previousFrame.setVisible(true);
+        if (previousFrame != null) {
+            previousFrame.setVisible(true);
+        }
+    } catch (java.sql.SQLException ex) {
+        // Specific check for existing emails (unique constraint violations in Neon)
+        if (ex.getMessage().contains("duplicate key") || ex.getMessage().contains("unique constraint")) {
+            errorLabel.setText("Email is already registered. Please login.");
+        } else {
+            errorLabel.setText("Database Error: " + ex.getMessage());
+        }
+        ex.printStackTrace(); // Log details to the VS Code terminal for debugging
     } catch (Exception ex) {
-        // NOW this will actually trigger if the database insert fails
-        ex.printStackTrace(); // Look at your VS Code console for the REAL error
+        // Catch-all for other unexpected errors (e.g., network timeout)
         errorLabel.setText("Signup failed: " + ex.getMessage());
+        ex.printStackTrace();
     }
-    }
+}
 }

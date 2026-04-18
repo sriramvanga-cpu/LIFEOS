@@ -34,7 +34,6 @@ public class FinancePanel extends JPanel {
     private JSpinner yearSpinner;
 
     public FinancePanel(int userId) {
-        System.out.println("FinancePanel constructor started for user: " + userId);
         this.userId = userId;
         this.db = new FinanceDAO();
         this.accountDAO = new AccountDAO();
@@ -64,8 +63,6 @@ public class FinancePanel extends JPanel {
                 refreshAccountsList();
             }
         });
-
-        System.out.println("FinancePanel constructor completed");
     }
 
     private JPanel buildMonthNavigationBar() {
@@ -115,9 +112,10 @@ public class FinancePanel extends JPanel {
         monthLabel.setText(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
     }
 
-    private void refreshAllData() {
+    public void refreshAllData() {
         refreshRecordsTab();
         refreshAnalysisTab();
+        refreshAccountsList();
     }
 
     private JPanel buildRecordsPanel() {
@@ -149,8 +147,12 @@ public class FinancePanel extends JPanel {
         addBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
         addBtn.setBackground(PRIMARY_BLUE);
         addBtn.setForeground(WHITE);
+        
+        // --- MAC COMPATIBILITY ---
         addBtn.setOpaque(true);
         addBtn.setBorderPainted(false);
+        // -------------------------
+
         addBtn.setFocusPainted(false);
         addBtn.setPreferredSize(new Dimension(400, 50));
         addBtn.addActionListener(e -> {
@@ -175,15 +177,8 @@ public class FinancePanel extends JPanel {
         LocalDate monthEnd = currentMonth.atEndOfMonth();
         List<Transaction> monthTransactions = new ArrayList<>();
         for (Transaction t : transactions) {
-            LocalDate transDate = null;
-            if (t.transTime != null) {
-                transDate = t.transTime.toLocalDateTime().toLocalDate();
-            } else if (t.transDate != null) {
-                transDate = t.transDate.toLocalDate();
-            } else {
-                continue;
-            }
-            if (!transDate.isBefore(monthStart) && !transDate.isAfter(monthEnd)) {
+            LocalDate transDate = (t.transTime != null) ? t.transTime.toLocalDateTime().toLocalDate() : (t.transDate != null ? t.transDate.toLocalDate() : null);
+            if (transDate != null && !transDate.isBefore(monthStart) && !transDate.isAfter(monthEnd)) {
                 monthTransactions.add(t);
             }
         }
@@ -192,10 +187,9 @@ public class FinancePanel extends JPanel {
         double totalExpense = 0;
 
         for (Transaction t : monthTransactions) {
-            boolean isExpense = t.type.equalsIgnoreCase("EXPENSE");
             recordsListPanel.add(createTransactionRow(t));
-            if (isExpense) totalExpense += t.amount;
-            else if (t.type.equalsIgnoreCase("INCOME")) totalIncome += t.amount;
+            if ("EXPENSE".equalsIgnoreCase(t.type)) totalExpense += t.amount;
+            else if ("INCOME".equalsIgnoreCase(t.type)) totalIncome += t.amount;
         }
 
         expenseVal.setText("₹" + String.format("%.2f", totalExpense));
@@ -222,10 +216,10 @@ public class FinancePanel extends JPanel {
     private JPanel createTransactionRow(Transaction t) {
         JPanel row = new JPanel(new BorderLayout());
         row.setBackground(WHITE);
-        row.setMaximumSize(new Dimension(2000, 55)); // tighter height
+        row.setMaximumSize(new Dimension(2000, 55));
         row.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, LIGHT_BLUE),
-                new EmptyBorder(6, 15, 6, 15))); // tighter padding
+                new EmptyBorder(6, 15, 6, 15)));
 
         String accountName = getAccountName(t.accountId);
         String toAccountName = t.toAccountId != null ? getAccountName(t.toAccountId) : "";
@@ -237,15 +231,8 @@ public class FinancePanel extends JPanel {
         catLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
         leftPanel.add(catLabel);
 
-        String detailText;
-        if ("TRANSFER".equals(t.type)) {
-            detailText = accountName + " → " + toAccountName;
-        } else {
-            detailText = accountName;
-        }
-        if (t.notes != null && !t.notes.isEmpty()) {
-            detailText += " • " + t.notes;
-        }
+        String detailText = "TRANSFER".equals(t.type) ? accountName + " → " + toAccountName : accountName;
+        if (t.notes != null && !t.notes.isEmpty()) detailText += " • " + t.notes;
         JLabel detailLabel = new JLabel(detailText);
         detailLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         detailLabel.setForeground(Color.GRAY);
@@ -257,18 +244,9 @@ public class FinancePanel extends JPanel {
         String amountStr;
         Color amountColor;
         switch (t.type) {
-            case "EXPENSE":
-                amountStr = "-₹" + String.format("%.2f", t.amount);
-                amountColor = EXPENSE_RED;
-                break;
-            case "INCOME":
-                amountStr = "+₹" + String.format("%.2f", t.amount);
-                amountColor = INCOME_GREEN;
-                break;
-            default:
-                amountStr = "↻₹" + String.format("%.2f", t.amount);
-                amountColor = TRANSFER_PURPLE;
-                break;
+            case "EXPENSE": amountStr = "-₹" + String.format("%.2f", t.amount); amountColor = EXPENSE_RED; break;
+            case "INCOME": amountStr = "+₹" + String.format("%.2f", t.amount); amountColor = INCOME_GREEN; break;
+            default: amountStr = "↻₹" + String.format("%.2f", t.amount); amountColor = TRANSFER_PURPLE; break;
         }
 
         JLabel val = new JLabel(amountStr);
@@ -277,31 +255,17 @@ public class FinancePanel extends JPanel {
 
         JButton deleteBtn = new JButton("✕");
         deleteBtn.setForeground(Color.RED);
-        deleteBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
         deleteBtn.setContentAreaFilled(false);
         deleteBtn.setBorderPainted(false);
-        deleteBtn.setFocusPainted(false);
         deleteBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        deleteBtn.setToolTipText("Delete transaction");
         deleteBtn.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(this,
-                    "Delete this transaction?",
-                    "Confirm Delete",
-                    JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
-                if (db.deleteTransaction(t.id)) {
-                    refreshRecordsTab();
-                    refreshAccountsList();
-                    refreshAnalysisTab();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Failed to delete.", "Error", JOptionPane.ERROR_MESSAGE);
-                }
+            if (JOptionPane.showConfirmDialog(this, "Delete transaction?", "Confirm", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+                if (db.deleteTransaction(t.id)) { refreshRecordsTab(); refreshAccountsList(); refreshAnalysisTab(); }
             }
         });
 
         rightPanel.add(val);
         rightPanel.add(deleteBtn);
-
         row.add(leftPanel, BorderLayout.WEST);
         row.add(rightPanel, BorderLayout.EAST);
         return row;
@@ -309,9 +273,7 @@ public class FinancePanel extends JPanel {
 
     private String getAccountName(int accountId) {
         List<Account> accounts = accountDAO.getAccounts(userId);
-        for (Account acc : accounts) {
-            if (acc.id == accountId) return acc.name;
-        }
+        for (Account acc : accounts) if (acc.id == accountId) return acc.name;
         return "Unknown";
     }
 
@@ -327,30 +289,24 @@ public class FinancePanel extends JPanel {
         JLabel title = new JLabel("Expense Breakdown");
         title.setFont(new Font("Segoe UI", Font.BOLD, 20));
         title.setForeground(PRIMARY_BLUE);
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(title);
         content.add(Box.createRigidArea(new Dimension(0, 20)));
 
         pieChartPanel = new PieChartPanel();
         pieChartPanel.setPreferredSize(new Dimension(500, 400));
         pieChartPanel.setBackground(WHITE);
-        pieChartPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(pieChartPanel);
         content.add(Box.createRigidArea(new Dimension(0, 20)));
 
-        // --- Yearly Bar Chart Section ---
         JPanel yearlyHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         yearlyHeader.setBackground(WHITE);
-        yearlyHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel yearlyTitle = new JLabel("Yearly Trend");
         yearlyTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         yearlyTitle.setForeground(PRIMARY_BLUE);
         yearlyHeader.add(yearlyTitle);
         yearlyHeader.add(Box.createRigidArea(new Dimension(20, 0)));
 
-        SpinnerNumberModel yearModel = new SpinnerNumberModel(YearMonth.now().getYear(), 2000, 2100, 1);
-        yearSpinner = new JSpinner(yearModel);
-        yearSpinner.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        yearSpinner = new JSpinner(new SpinnerNumberModel(YearMonth.now().getYear(), 2000, 2100, 1));
         yearSpinner.addChangeListener(e -> refreshYearlyChart());
         yearlyHeader.add(new JLabel("Year: "));
         yearlyHeader.add(yearSpinner);
@@ -358,14 +314,7 @@ public class FinancePanel extends JPanel {
         content.add(Box.createRigidArea(new Dimension(0, 10)));
 
         yearlyBarChart = new YearlyExpenseBarChart();
-        yearlyBarChart.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(yearlyBarChart);
-        content.add(Box.createRigidArea(new Dimension(0, 20)));
-
-        JPanel statsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 30, 10));
-        statsPanel.setBackground(WHITE);
-        statsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(statsPanel);
 
         panel.add(content, BorderLayout.NORTH);
         return panel;
@@ -376,20 +325,13 @@ public class FinancePanel extends JPanel {
             List<Transaction> all = db.getTransactions(userId);
             LocalDate monthStart = currentMonth.atDay(1);
             LocalDate monthEnd = currentMonth.atEndOfMonth();
-
             Map<String, Double> categoryTotals = new HashMap<>();
             for (Transaction t : all) {
                 if (!"EXPENSE".equals(t.type)) continue;
-                LocalDate transDate = null;
-                if (t.transTime != null) {
-                    transDate = t.transTime.toLocalDateTime().toLocalDate();
-                } else if (t.transDate != null) {
-                    transDate = t.transDate.toLocalDate();
-                } else {
-                    continue;
+                LocalDate d = (t.transTime != null) ? t.transTime.toLocalDateTime().toLocalDate() : (t.transDate != null ? t.transDate.toLocalDate() : null);
+                if (d != null && !d.isBefore(monthStart) && !d.isAfter(monthEnd)) {
+                    categoryTotals.merge(t.category, t.amount, Double::sum);
                 }
-                if (transDate.isBefore(monthStart) || transDate.isAfter(monthEnd)) continue;
-                categoryTotals.put(t.category, categoryTotals.getOrDefault(t.category, 0.0) + t.amount);
             }
             pieChartPanel.setData(categoryTotals);
         }
@@ -398,90 +340,27 @@ public class FinancePanel extends JPanel {
 
     private void refreshYearlyChart() {
         if (yearlyBarChart != null && yearSpinner != null) {
-            int year = (Integer) yearSpinner.getValue();
-            List<Transaction> all = db.getTransactions(userId);
-            yearlyBarChart.setData(all, year);
+            yearlyBarChart.setData(db.getTransactions(userId), (Integer) yearSpinner.getValue());
         }
     }
 
     private class PieChartPanel extends JPanel {
         private Map<String, Double> data = new HashMap<>();
-        private final Color[] COLORS = {
-                new Color(66, 133, 244),
-                new Color(219, 68, 55),
-                new Color(244, 180, 0),
-                new Color(15, 157, 88),
-                new Color(171, 71, 188),
-                new Color(255, 138, 101),
-                new Color(0, 172, 193),
-                new Color(158, 158, 158),
-        };
-
-        public void setData(Map<String, Double> data) {
-            this.data = data;
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
+        private final Color[] COLORS = { new Color(66, 133, 244), new Color(219, 68, 55), new Color(244, 180, 0), new Color(15, 157, 88), new Color(171, 71, 188) };
+        public void setData(Map<String, Double> data) { this.data = data; repaint(); }
+        @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (data.isEmpty()) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Color.GRAY);
-                g2.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-                String msg = "No expenses this month";
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(msg, (getWidth() - fm.stringWidth(msg)) / 2, getHeight() / 2);
-                return;
-            }
-
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int width = getWidth();
-            int height = getHeight();
-            int size = Math.min(width, height) - 100;
-            int x = (width - size) / 2;
-            int y = (height - size) / 2;
-
-            double total = data.values().stream().mapToDouble(Double::doubleValue).sum();
-            if (total <= 0) return;
-
-            double startAngle = 0.0;
+            if (data.isEmpty()) return;
+            Graphics2D g2 = (Graphics2D) g; g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int size = Math.min(getWidth(), getHeight()) - 100;
+            int x = (getWidth() - size) / 2, y = (getHeight() - size) / 2;
+            double total = data.values().stream().mapToDouble(Double::doubleValue).sum(), startAngle = 0.0;
             int colorIndex = 0;
-            List<Map.Entry<String, Double>> sorted = new ArrayList<>(data.entrySet());
-            sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-
-            for (Map.Entry<String, Double> entry : sorted) {
-                double value = entry.getValue();
-                double angle = (value / total) * 360.0;
-                g2.setColor(COLORS[colorIndex % COLORS.length]);
+            for (Map.Entry<String, Double> entry : data.entrySet()) {
+                double angle = (entry.getValue() / total) * 360.0;
+                g2.setColor(COLORS[colorIndex++ % COLORS.length]);
                 g2.fill(new Arc2D.Double(x, y, size, size, startAngle, angle, Arc2D.PIE));
                 startAngle += angle;
-                colorIndex++;
-            }
-
-            int legendX = x + size + 20;
-            int legendY = y;
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            FontMetrics fm = g2.getFontMetrics();
-            int lineHeight = fm.getHeight() + 4;
-            colorIndex = 0;
-
-            for (Map.Entry<String, Double> entry : sorted) {
-                if (legendY + lineHeight > y + size) break;
-                String label = entry.getKey();
-                double value = entry.getValue();
-                double percentage = (value / total) * 100.0;
-                String text = String.format("%s: ₹%.2f (%.1f%%)", label, value, percentage);
-
-                g2.setColor(COLORS[colorIndex % COLORS.length]);
-                g2.fillRect(legendX, legendY, 12, 12);
-                g2.setColor(Color.BLACK);
-                g2.drawString(text, legendX + 18, legendY + 12);
-                legendY += lineHeight;
-                colorIndex++;
             }
         }
     }
@@ -501,14 +380,15 @@ public class FinancePanel extends JPanel {
         JButton addAccountBtn = new JButton("+ Add Account");
         addAccountBtn.setBackground(PRIMARY_BLUE);
         addAccountBtn.setForeground(WHITE);
+        
+        // --- MAC COMPATIBILITY ---
         addAccountBtn.setOpaque(true);
         addAccountBtn.setBorderPainted(false);
-        addAccountBtn.setFocusPainted(false);
+        // -------------------------
+
         addAccountBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         addAccountBtn.addActionListener(e -> openAccountDialog(null));
         header.add(addAccountBtn, BorderLayout.EAST);
-
-        panel.add(header, BorderLayout.NORTH);
 
         accountsListPanel = new JPanel();
         accountsListPanel.setLayout(new BoxLayout(accountsListPanel, BoxLayout.Y_AXIS));
@@ -516,7 +396,7 @@ public class FinancePanel extends JPanel {
 
         JScrollPane scrollPane = new JScrollPane(accountsListPanel);
         scrollPane.setBorder(null);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        panel.add(header, BorderLayout.NORTH);
         panel.add(scrollPane, BorderLayout.CENTER);
 
         refreshAccountsList();
@@ -526,19 +406,9 @@ public class FinancePanel extends JPanel {
     private void refreshAccountsList() {
         accountsListPanel.removeAll();
         List<Account> accounts = accountDAO.getAccounts(userId);
-
-        if (accounts.isEmpty()) {
-            JLabel empty = new JLabel("No accounts yet. Add one to start tracking.");
-            empty.setForeground(Color.GRAY);
-            empty.setAlignmentX(Component.CENTER_ALIGNMENT);
-            accountsListPanel.add(Box.createVerticalGlue());
-            accountsListPanel.add(empty);
-            accountsListPanel.add(Box.createVerticalGlue());
-        } else {
-            for (Account acc : accounts) {
-                accountsListPanel.add(createAccountCard(acc));
-                accountsListPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-            }
+        for (Account acc : accounts) {
+            accountsListPanel.add(createAccountCard(acc));
+            accountsListPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         }
         accountsListPanel.revalidate();
         accountsListPanel.repaint();
@@ -550,7 +420,7 @@ public class FinancePanel extends JPanel {
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(230, 230, 230), 1, true),
                 new EmptyBorder(15, 20, 15, 20)));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120)); // Taller for progress bar
 
         JPanel left = new JPanel();
         left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
@@ -563,9 +433,24 @@ public class FinancePanel extends JPanel {
         left.add(nameLabel);
         left.add(typeLabel);
 
+        // --- BUDGETING PROGRESS BAR ---
+        // This assumes you added the 'budget' field to the Account class
+        if (acc.budget > 0) {
+            left.add(Box.createRigidArea(new Dimension(0, 10)));
+            JProgressBar budgetBar = new JProgressBar(0, (int)acc.budget);
+            budgetBar.setValue((int)Math.abs(acc.balance));
+            budgetBar.setForeground(acc.balance > acc.budget ? EXPENSE_RED : INCOME_GREEN);
+            budgetBar.setPreferredSize(new Dimension(150, 8));
+            
+            JLabel budgetLabel = new JLabel(String.format("Budget: ₹%.2f / ₹%.2f", Math.abs(acc.balance), acc.budget));
+            budgetLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+            
+            left.add(budgetBar);
+            left.add(budgetLabel);
+        }
+
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         right.setOpaque(false);
-
         JLabel balanceLabel = new JLabel("₹" + String.format("%.2f", acc.balance));
         balanceLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         balanceLabel.setForeground(acc.balance < 0 ? EXPENSE_RED : PRIMARY_BLUE);
@@ -573,32 +458,10 @@ public class FinancePanel extends JPanel {
         JButton editBtn = new JButton("Edit");
         editBtn.setForeground(PRIMARY_BLUE);
         editBtn.setContentAreaFilled(false);
-        editBtn.setBorderPainted(false);
-        editBtn.setFocusPainted(false);
-        editBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         editBtn.addActionListener(e -> openAccountDialog(acc));
-
-        JButton deleteBtn = new JButton("✕");
-        deleteBtn.setForeground(Color.RED);
-        deleteBtn.setContentAreaFilled(false);
-        deleteBtn.setBorderPainted(false);
-        deleteBtn.setFocusPainted(false);
-        deleteBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        deleteBtn.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(this,
-                    "Delete account \"" + acc.name + "\"? All related transactions will remain but may become orphaned.",
-                    "Confirm Delete",
-                    JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
-                if (accountDAO.deleteAccount(acc.id)) {
-                    refreshAccountsList();
-                }
-            }
-        });
 
         right.add(balanceLabel);
         right.add(editBtn);
-        right.add(deleteBtn);
 
         card.add(left, BorderLayout.WEST);
         card.add(right, BorderLayout.EAST);
@@ -606,81 +469,99 @@ public class FinancePanel extends JPanel {
     }
 
     private void openAccountDialog(Account existing) {
-        boolean isEdit = existing != null;
-        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                isEdit ? "Edit Account" : "Add Account", true);
-        dialog.setSize(400, 300);
-        dialog.setLocationRelativeTo(this);
-        dialog.setLayout(new BorderLayout());
+    boolean isEdit = existing != null;
+    JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), 
+            isEdit ? "Edit Account" : "Add Account", true);
+    dialog.setSize(400, 380); // Increased height for the budget field
+    dialog.setLocationRelativeTo(this);
+    dialog.setLayout(new BorderLayout());
 
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBackground(WHITE);
-        form.setBorder(new EmptyBorder(20, 20, 20, 20));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(8, 5, 8, 5);
-        gbc.weightx = 1.0;
+    JPanel form = new JPanel(new GridBagLayout());
+    form.setBackground(WHITE);
+    form.setBorder(new EmptyBorder(20, 20, 20, 20));
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.fill = GridBagConstraints.HORIZONTAL;
+    gbc.insets = new Insets(8, 5, 8, 5);
+    gbc.weightx = 1.0;
 
-        gbc.gridy = 0; gbc.gridx = 0; gbc.weightx = 0.2;
-        form.add(new JLabel("Name:"), gbc);
-        JTextField nameField = new JTextField(existing != null ? existing.name : "");
-        gbc.gridx = 1; gbc.weightx = 0.8;
-        form.add(nameField, gbc);
+    // --- Name Field ---
+    gbc.gridy = 0; gbc.gridx = 0; gbc.weightx = 0.3;
+    form.add(new JLabel("Name:"), gbc);
+    JTextField nameField = new JTextField(isEdit ? existing.name : "");
+    gbc.gridx = 1; gbc.weightx = 0.7;
+    form.add(nameField, gbc);
 
-        gbc.gridy = 1; gbc.gridx = 0; gbc.weightx = 0.2;
-        form.add(new JLabel("Type:"), gbc);
-        String[] types = {"Cash", "Bank", "Credit Card", "Savings", "Investment", "Other"};
-        JComboBox<String> typeBox = new JComboBox<>(types);
-        if (existing != null) {
-            typeBox.setSelectedItem(existing.type.replace('_', ' '));
-        }
-        gbc.gridx = 1; gbc.weightx = 0.8;
-        form.add(typeBox, gbc);
-
-        gbc.gridy = 2; gbc.gridx = 0; gbc.weightx = 0.2;
-        form.add(new JLabel("Initial Balance:"), gbc);
-        JSpinner balanceSpinner = new JSpinner(new SpinnerNumberModel(
-                existing != null ? existing.balance : 0.0, -1000000.0, 1000000.0, 100.0));
-        JSpinner.NumberEditor editor = new JSpinner.NumberEditor(balanceSpinner, "0.00");
-        balanceSpinner.setEditor(editor);
-        gbc.gridx = 1; gbc.weightx = 0.8;
-        form.add(balanceSpinner, gbc);
-
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttons.setBackground(WHITE);
-        JButton cancel = new JButton("Cancel");
-        cancel.addActionListener(e -> dialog.dispose());
-        JButton save = new JButton(isEdit ? "Save" : "Add");
-        save.setBackground(PRIMARY_BLUE);
-        save.setForeground(WHITE);
-        save.setFocusPainted(false);
-        save.addActionListener(e -> {
-            String name = nameField.getText().trim();
-            if (name.isEmpty()) {
-                JOptionPane.showMessageDialog(dialog, "Name is required.");
-                return;
-            }
-            String type = ((String) typeBox.getSelectedItem()).toUpperCase().replace(' ', '_');
-            double balance = ((Number) balanceSpinner.getValue()).doubleValue();
-
-            boolean success;
-            if (isEdit) {
-                success = accountDAO.updateAccount(existing.id, name, type);
-            } else {
-                success = accountDAO.addAccount(userId, name, type, balance);
-            }
-            if (success) {
-                refreshAccountsList();
-                dialog.dispose();
-            } else {
-                JOptionPane.showMessageDialog(dialog, "Operation failed.");
-            }
-        });
-        buttons.add(cancel);
-        buttons.add(save);
-
-        dialog.add(form, BorderLayout.CENTER);
-        dialog.add(buttons, BorderLayout.SOUTH);
-        dialog.setVisible(true);
+    // --- Type Field ---
+    gbc.gridy = 1; gbc.gridx = 0; gbc.weightx = 0.3;
+    form.add(new JLabel("Type:"), gbc);
+    String[] types = {"Cash", "Bank", "Credit Card", "Savings", "Investment", "Other"};
+    JComboBox<String> typeBox = new JComboBox<>(types);
+    if (isEdit) {
+        typeBox.setSelectedItem(existing.type.replace('_', ' '));
     }
+    gbc.gridx = 1; gbc.weightx = 0.7;
+    form.add(typeBox, gbc);
+
+    // --- Balance Field ---
+    gbc.gridy = 2; gbc.gridx = 0; gbc.weightx = 0.3;
+    form.add(new JLabel("Initial Balance:"), gbc);
+    JSpinner balanceSpinner = new JSpinner(new SpinnerNumberModel(
+            isEdit ? existing.balance : 0.0, -1000000.0, 1000000.0, 100.0));
+    gbc.gridx = 1; gbc.weightx = 0.7;
+    form.add(balanceSpinner, gbc);
+
+    // --- NEW: BUDGET FIELD ---
+    gbc.gridy = 3; gbc.gridx = 0; gbc.weightx = 0.3;
+    form.add(new JLabel("Monthly Budget:"), gbc);
+    JSpinner budgetSpinner = new JSpinner(new SpinnerNumberModel(
+            isEdit ? existing.budget : 0.0, 0.0, 1000000.0, 100.0));
+    gbc.gridx = 1; gbc.weightx = 0.7;
+    form.add(budgetSpinner, gbc);
+
+    // --- Action Buttons ---
+    JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    buttons.setBackground(WHITE);
+    JButton cancel = new JButton("Cancel");
+    cancel.addActionListener(e -> dialog.dispose());
+    
+    JButton save = new JButton(isEdit ? "Save" : "Add");
+    save.setBackground(PRIMARY_BLUE);
+    save.setForeground(WHITE);
+    save.setOpaque(true); 
+    save.setBorderPainted(false);
+    
+    save.addActionListener(e -> {
+        String name = nameField.getText().trim();
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(dialog, "Name is required.");
+            return;
+        }
+        
+        String type = ((String) typeBox.getSelectedItem()).toUpperCase().replace(' ', '_');
+        double bal = ((Number) balanceSpinner.getValue()).doubleValue();
+        double bud = ((Number) budgetSpinner.getValue()).doubleValue(); // Get the budget value
+
+        boolean success;
+        // UPDATED: Now passing 'bud' as the required extra argument
+        if (isEdit) {
+            success = accountDAO.updateAccount(existing.id, name, type, bud);
+        } else {
+            success = accountDAO.addAccount(userId, name, type, bal, bud);
+        }
+
+        if (success) {
+            refreshAccountsList();
+            dialog.dispose();
+        } else {
+            JOptionPane.showMessageDialog(dialog, "Operation failed.");
+        }
+    });
+    
+    buttons.add(cancel);
+    buttons.add(save);
+
+    dialog.add(form, BorderLayout.CENTER);
+    dialog.add(buttons, BorderLayout.SOUTH);
+    dialog.setVisible(true);
+}
 }
