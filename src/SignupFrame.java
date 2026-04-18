@@ -24,7 +24,7 @@ public class SignupFrame extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new GridBagLayout());
-        getContentPane().setBackground(new Color(240, 248, 255)); // light blue bg
+        getContentPane().setBackground(new Color(240, 248, 255));
 
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(Color.WHITE);
@@ -169,16 +169,14 @@ public class SignupFrame extends JFrame {
         return;
     }
 
-    // 2. Robust Email Validation (Regex)
-    // Ensures the email follows a standard "user@domain.com" pattern
-    String emailRegex = "^[A-Za-z0-9+_.-]+@(.+)$";
+    // 2. Robust Email Validation
+    String emailRegex = "^[A-Za-z0-9+_.-]+@(.+)\\.com$";
     if (!email.matches(emailRegex)) {
         errorLabel.setText("Please enter a valid email address");
         return;
     }
 
     // 3. Password Strength Check
-    // Prevents weak passwords from being registered
     if (password.length() < 6) {
         errorLabel.setText("Password must be at least 6 characters");
         return;
@@ -187,7 +185,7 @@ public class SignupFrame extends JFrame {
     // 4. Date of Birth Format Validation
     java.sql.Date dob;
     try {
-        dob = java.sql.Date.valueOf(dobText); // expects YYYY-MM-DD
+        dob = java.sql.Date.valueOf(dobText); //YYYY-MM-DD
     } catch (Exception ex) {
         errorLabel.setText("Invalid DOB format (YYYY-MM-DD)");
         return;
@@ -195,27 +193,24 @@ public class SignupFrame extends JFrame {
 
     // 5. Database Registration with Detailed Error Feedback
     try {
-        // Call the DAO to hash password and insert into Neon cloud
         dao.registerUser(name, email, password, dob); 
         
-        // Success Message
         JOptionPane.showMessageDialog(this, "Account created successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
         
-        // Transition back to Login screen
         setVisible(false);
         if (previousFrame != null) {
             previousFrame.setVisible(true);
         }
     } catch (java.sql.SQLException ex) {
-        // Specific check for existing emails (unique constraint violations in Neon)
+        // Specific check for existing emails
         if (ex.getMessage().contains("duplicate key") || ex.getMessage().contains("unique constraint")) {
             errorLabel.setText("Email is already registered. Please login.");
         } else {
             errorLabel.setText("Database Error: " + ex.getMessage());
         }
-        ex.printStackTrace(); // Log details to the VS Code terminal for debugging
+        ex.printStackTrace();
     } catch (Exception ex) {
-        // Catch-all for other unexpected errors (e.g., network timeout)
+        // Catch all other errors
         errorLabel.setText("Signup failed: " + ex.getMessage());
         ex.printStackTrace();
     }

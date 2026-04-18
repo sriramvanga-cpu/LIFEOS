@@ -50,7 +50,6 @@ public class ProfilePanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
 
-        // Info Rows
         addInfoRow(card, gbc, 0, "Name:", userDetails.getOrDefault("name", "N/A"));
         addInfoRow(card, gbc, 1, "Email:", userDetails.getOrDefault("email", "N/A"));
         addInfoRow(card, gbc, 2, "Date of Birth:", userDetails.getOrDefault("dob", "N/A"));
@@ -140,17 +139,17 @@ public class ProfilePanel extends JPanel {
         gbc.gridy=2; gbc.gridx=0; form.add(new JLabel("DOB:"), gbc); gbc.gridx=1; form.add(dobSpinner, gbc);
         gbc.gridy=3; gbc.gridx=0; form.add(new JLabel("Height (cm):"), gbc); gbc.gridx=1; form.add(heightSpinner, gbc);
 
-        // --- NEW: INLINE ERROR LABEL ---
+        // INLINE ERROR LABEL  
         JLabel errorLabel = new JLabel(" ");
         errorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
         gbc.gridy=4; gbc.gridx=0; gbc.gridwidth=2; 
-        gbc.insets = new Insets(0, 10, 0, 10); // Tighter padding
+        gbc.insets = new Insets(0, 10, 0, 10);
         form.add(errorLabel, gbc);
 
         JButton saveBtn = createButton("Save Changes", new Color(52, 168, 83), Color.WHITE);
         saveBtn.addActionListener(e -> {
-            errorLabel.setText(" "); // Reset on click
+            errorLabel.setText(" ");
             
             String name = nameField.getText().trim();
             String email = emailField.getText().trim();
@@ -165,7 +164,7 @@ public class ProfilePanel extends JPanel {
 
             boolean success = dao.updateUserDetails(userId, name, email, new java.sql.Date(dobDate.getTime()), height);
             if (success) {
-                errorLabel.setForeground(new Color(52, 168, 83)); // Green success
+                errorLabel.setForeground(new Color(52, 168, 83));
                 errorLabel.setText("Profile Updated Successfully!");
                 
                 // Close automatically after 1 second
@@ -195,7 +194,7 @@ public class ProfilePanel extends JPanel {
         Window parent = SwingUtilities.getWindowAncestor(this);
         JDialog dialog = new JDialog((Frame) parent, "Change Password", true);
         
-        dialog.setSize(450, 360); // Made slightly taller to comfortably fit the label
+        dialog.setSize(450, 360);
         dialog.setLocationRelativeTo(this);
         dialog.setLayout(new BorderLayout());
         
@@ -237,17 +236,17 @@ public class ProfilePanel extends JPanel {
         gbc.gridx = 1; gbc.weightx = 0.7; 
         form.add(confirmPass, gbc);
 
-        // --- NEW: INLINE ERROR LABEL ---
+        // INLINE ERROR LABEL  
         JLabel errorLabel = new JLabel(" ");
         errorLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
         errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
         gbc.gridy = 3; gbc.gridx = 0; gbc.gridwidth = 2;
-        gbc.insets = new Insets(5, 10, 0, 10); // Pull it slightly closer to the text boxes
+        gbc.insets = new Insets(5, 10, 0, 10);
         form.add(errorLabel, gbc);
 
         JButton saveBtn = createButton("Update Password", new Color(234, 67, 53), Color.WHITE);
         saveBtn.addActionListener(e -> {
-            errorLabel.setText(" "); // Reset on click
+            errorLabel.setText(" ");
             
             String curr = new String(currentPass.getPassword());
             String n1 = new String(newPass.getPassword());
@@ -266,7 +265,7 @@ public class ProfilePanel extends JPanel {
 
             boolean success = dao.updatePassword(userId, curr, n1);
             if (success) {
-                errorLabel.setForeground(new Color(52, 168, 83)); // Green success
+                errorLabel.setForeground(new Color(52, 168, 83));
                 errorLabel.setText("Password changed securely!");
                 
                 // Close automatically after 1 second

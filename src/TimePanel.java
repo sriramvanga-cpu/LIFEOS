@@ -12,7 +12,7 @@ public class TimePanel extends JPanel {
     private JLabel monthLabel;
     private TaskDAO taskDAO = new TaskDAO(); 
     
-    // --- CHANGED: No longer hardcoded to 1 ---
+    //   CHANGED: No longer hardcoded to 1  
     private int userId;
     private int selectedDay = -1;
 
@@ -29,7 +29,7 @@ public class TimePanel extends JPanel {
         new Color(0,172,193)     // 5: Meeting / Teal
     };
 
-    // --- CHANGED: Now uses the actual category string to determine color ---
+    //   CHANGED: Now uses the actual category string to determine color  
     private Color getTaskColor(Task t) {
         if (t.category == null) return taskColors[0];
         
@@ -43,7 +43,7 @@ public class TimePanel extends JPanel {
         }
     }
 
-    // --- CHANGED: Constructor accepts the user ID ---
+    //   CHANGED: Constructor accepts the user ID  
     public TimePanel(int loggedInUserId) {
         this.userId = loggedInUserId;
         
@@ -154,7 +154,7 @@ public class TimePanel extends JPanel {
     monthLabel = new JLabel("", SwingConstants.CENTER);
     monthLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
     
-    // --- KEY FIX: Set a fixed width so the buttons don't move ---
+    //   KEY FIX: Set a fixed width so the buttons don't move  
     // 250 pixels is usually wide enough for "September 2026"
     monthLabel.setPreferredSize(new Dimension(250, 40)); 
 
@@ -165,7 +165,6 @@ public class TimePanel extends JPanel {
     navGroup.add(monthLabel);
     navGroup.add(next);
 
-    // Keep the "Create" button on the far right
     JButton create = new JButton("+ Create");
     create.setBackground(new Color(66, 133, 244));
     create.setForeground(Color.WHITE);
@@ -184,7 +183,6 @@ public class TimePanel extends JPanel {
     prev.addActionListener(e -> { currentMonth = currentMonth.minusMonths(1); loadCalendar(); });
     next.addActionListener(e -> { currentMonth = currentMonth.plusMonths(1); loadCalendar(); });
 
-    // Add the stable navigation group to the center
     top.add(navGroup, BorderLayout.CENTER);
     top.add(right, BorderLayout.EAST);
 

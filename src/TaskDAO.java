@@ -3,10 +3,10 @@ import java.util.*;
 
 public class TaskDAO {
 
-    // ===== GET TASKS FOR A SPECIFIC DATE =====
+    // GET TASKS FOR A SPECIFIC DATE  
     public List<Task> getTasksByDate(int userId, java.sql.Date date) {
         List<Task> tasks = new ArrayList<>();
-        // UPDATED: Changed START_DATE to START_TIME
+
         String query = "SELECT * FROM TASKS WHERE USER_ID = ? AND START_TIME = ?";
 
         Connection conn = DBConnection.getConnection();
@@ -27,10 +27,10 @@ public class TaskDAO {
     }
 
 
-    // ===== GET TASKS FOR A WHOLE MONTH =====
+    // GET TASKS FOR A WHOLE MONTH  
     public List<Task> getTasksByMonth(int userId, java.sql.Date anyDateInMonth) {
         List<Task> tasks = new ArrayList<>();
-        // UPDATED: Changed START_DATE to START_TIME
+
         String query = "SELECT * FROM TASKS WHERE USER_ID = ? " +
                        "AND START_TIME >= date_trunc('month', ?::date) " +
                        "AND START_TIME < date_trunc('month', ?::date) + interval '1 month'";
@@ -54,12 +54,11 @@ public class TaskDAO {
     }
 
 
-    // ===== ADD TASK =====
+    // ADD TASK  
     public void addTask(int userId, String title, String category, String description, 
                         java.sql.Date date, int startHour, int startMin,
                         int endHour, int endMin) {
 
-        // UPDATED: Changed column name to START_TIME
         String query = "INSERT INTO TASKS " +
                 "(USER_ID, TITLE, CATEGORY, DESCRIPTION, START_TIME, START_HOUR, START_MIN, END_HOUR, END_MIN, STATUS) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')";
@@ -84,7 +83,7 @@ public class TaskDAO {
     }
 
 
-    // ===== COMMON MAPPER =====
+    // COMMON MAPPER  
     private Task mapTask(ResultSet rs) throws SQLException {
         return new Task(
                 rs.getInt("TASK_ID"),
@@ -92,7 +91,7 @@ public class TaskDAO {
                 rs.getString("TITLE"),
                 rs.getString("CATEGORY"),      
                 rs.getString("DESCRIPTION"),   
-                rs.getDate("START_TIME"), // UPDATED: Changed from START_DATE
+                rs.getDate("START_TIME"),
                 rs.getInt("START_HOUR"),
                 rs.getInt("START_MIN"),
                 rs.getInt("END_HOUR"),
@@ -100,7 +99,7 @@ public class TaskDAO {
         );
     }
 
-    // ===== DELETE TASK =====
+    // DELETE TASK  
     public void deleteTask(int taskId) {
         String query = "DELETE FROM TASKS WHERE TASK_ID = ?";
         Connection conn = DBConnection.getConnection();
@@ -114,12 +113,11 @@ public class TaskDAO {
         }
     }
 
-    // ===== UPDATE TASK =====
+    // UPDATE TASK  
     public void updateTask(int taskId, String title, String category, String description, 
                            java.sql.Date date, int startHour, int startMin,
                            int endHour, int endMin) {
 
-        // UPDATED: Changed START_DATE to START_TIME
         String query = "UPDATE TASKS SET " +
                 "TITLE = ?, CATEGORY = ?, DESCRIPTION = ?, START_TIME = ?, " +
                 "START_HOUR = ?, START_MIN = ?, END_HOUR = ?, END_MIN = ? " +

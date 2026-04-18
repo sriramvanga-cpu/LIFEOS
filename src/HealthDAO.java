@@ -3,7 +3,7 @@ import java.util.*;
 
 public class HealthDAO {
 
-    // --- DATA MODELS ---
+    //   DATA MODELS  
     public static class HealthRecord {
         public double sleep = 0.0;
         public int steps = 0;
@@ -27,9 +27,7 @@ public class HealthDAO {
         public java.sql.Timestamp endTime;
     }
 
-    // =========================================================================
     // DAILY RECORDS & WEIGHT PERSISTENCE
-    // =========================================================================
     
     public HealthRecord getDailyRecord(int userId, java.sql.Date date) {
         HealthRecord record = new HealthRecord();
@@ -100,9 +98,7 @@ public class HealthDAO {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // =========================================================================
     // CHARTING & STREAKS
-    // =========================================================================
 
     public Map<java.time.LocalDate, Double> getWeeklyMetric(int userId, String columnName) {
         Map<java.time.LocalDate, Double> data = new LinkedHashMap<>();
@@ -143,9 +139,7 @@ public class HealthDAO {
         return streak;
     }
 
-    // =========================================================================
     // ACTIVITY LOGGING
-    // =========================================================================
 
     public List<ActivityLog> getActivities(int userId) {
         List<ActivityLog> logs = new ArrayList<>();
@@ -198,9 +192,7 @@ public class HealthDAO {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // =========================================================================
     // MEDICATIONS & USER PROFILE HELPERS
-    // =========================================================================
 
     public List<Medication> getMedications(int userId) {
         List<Medication> meds = new ArrayList<>();

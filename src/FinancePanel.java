@@ -148,10 +148,10 @@ public class FinancePanel extends JPanel {
         addBtn.setBackground(PRIMARY_BLUE);
         addBtn.setForeground(WHITE);
         
-        // --- MAC COMPATIBILITY ---
+        //   MAC COMPATIBILITY  
         addBtn.setOpaque(true);
         addBtn.setBorderPainted(false);
-        // -------------------------
+        //         -
 
         addBtn.setFocusPainted(false);
         addBtn.setPreferredSize(new Dimension(400, 50));
@@ -381,10 +381,10 @@ public class FinancePanel extends JPanel {
         addAccountBtn.setBackground(PRIMARY_BLUE);
         addAccountBtn.setForeground(WHITE);
         
-        // --- MAC COMPATIBILITY ---
+        //   MAC COMPATIBILITY  
         addAccountBtn.setOpaque(true);
         addAccountBtn.setBorderPainted(false);
-        // -------------------------
+        //         -
 
         addAccountBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         addAccountBtn.addActionListener(e -> openAccountDialog(null));
@@ -433,7 +433,7 @@ public class FinancePanel extends JPanel {
         left.add(nameLabel);
         left.add(typeLabel);
 
-        // --- BUDGETING PROGRESS BAR ---
+        //   BUDGETING PROGRESS BAR  
         // This assumes you added the 'budget' field to the Account class
         if (acc.budget > 0) {
             left.add(Box.createRigidArea(new Dimension(0, 10)));
@@ -484,14 +484,14 @@ public class FinancePanel extends JPanel {
     gbc.insets = new Insets(8, 5, 8, 5);
     gbc.weightx = 1.0;
 
-    // --- Name Field ---
+    //   Name Field  
     gbc.gridy = 0; gbc.gridx = 0; gbc.weightx = 0.3;
     form.add(new JLabel("Name:"), gbc);
     JTextField nameField = new JTextField(isEdit ? existing.name : "");
     gbc.gridx = 1; gbc.weightx = 0.7;
     form.add(nameField, gbc);
 
-    // --- Type Field ---
+    //   Type Field  
     gbc.gridy = 1; gbc.gridx = 0; gbc.weightx = 0.3;
     form.add(new JLabel("Type:"), gbc);
     String[] types = {"Cash", "Bank", "Credit Card", "Savings", "Investment", "Other"};
@@ -502,7 +502,7 @@ public class FinancePanel extends JPanel {
     gbc.gridx = 1; gbc.weightx = 0.7;
     form.add(typeBox, gbc);
 
-    // --- Balance Field ---
+    //   Balance Field  
     gbc.gridy = 2; gbc.gridx = 0; gbc.weightx = 0.3;
     form.add(new JLabel("Initial Balance:"), gbc);
     JSpinner balanceSpinner = new JSpinner(new SpinnerNumberModel(
@@ -510,7 +510,7 @@ public class FinancePanel extends JPanel {
     gbc.gridx = 1; gbc.weightx = 0.7;
     form.add(balanceSpinner, gbc);
 
-    // --- NEW: BUDGET FIELD ---
+    //   NEW: BUDGET FIELD  
     gbc.gridy = 3; gbc.gridx = 0; gbc.weightx = 0.3;
     form.add(new JLabel("Monthly Budget:"), gbc);
     JSpinner budgetSpinner = new JSpinner(new SpinnerNumberModel(
@@ -518,7 +518,7 @@ public class FinancePanel extends JPanel {
     gbc.gridx = 1; gbc.weightx = 0.7;
     form.add(budgetSpinner, gbc);
 
-    // --- Action Buttons ---
+    //   Action Buttons  
     JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
     buttons.setBackground(WHITE);
     JButton cancel = new JButton("Cancel");

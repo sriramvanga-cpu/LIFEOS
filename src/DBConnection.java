@@ -6,7 +6,7 @@ public class DBConnection {
     private static final String USER = "neondb_owner";
     private static final String PASSWORD = "npg_Jy46stNiGIUK";
     
-    private static Connection sharedConnection; // Persistent connection
+    private static Connection sharedConnection;
 
     public static Connection getConnection() {
         try {

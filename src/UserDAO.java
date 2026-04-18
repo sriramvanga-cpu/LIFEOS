@@ -6,7 +6,6 @@ public class UserDAO {
     
     /**
      * Registers a new user using the shared connection.
-     * Throws SQLException so the UI can catch and display errors.
      */
     public void registerUser(String name, String email, String password, java.sql.Date dob) throws SQLException {
         String query = "INSERT INTO USERS (NAME, EMAIL, PASSWORD_HASH, DOB, HEIGHT) VALUES (?,?,?,?, 170)";
@@ -31,7 +30,6 @@ public class UserDAO {
 
     /**
      * Validates user credentials. 
-     * Now much faster because it reuses the established connection.
      */
     public int login(String email, String password) {
         String query = "SELECT USER_ID, PASSWORD_HASH FROM USERS WHERE EMAIL = ?";

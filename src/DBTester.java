@@ -8,7 +8,7 @@ public class DBTester {
         String user = "neondb_owner";
         String pass = "npg_Jy46stNiGIUK";
 
-        System.out.println("--- Starting Connection Test ---");
+        System.out.println("  Starting Connection Test  ");
         try {
             Class.forName("org.postgresql.Driver");
             System.out.println("1. Driver Loaded Successfully.");
@@ -23,7 +23,7 @@ public class DBTester {
         } catch (java.sql.SQLException e) {
             System.err.println("2. ❌ ERROR: SQL State: " + e.getSQLState());
             System.err.println("Message: " + e.getMessage());
-            e.printStackTrace(); // This prints the vital 'why'
+            e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         }

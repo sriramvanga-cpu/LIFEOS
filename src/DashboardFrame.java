@@ -15,7 +15,7 @@ public class DashboardFrame extends JFrame {
     public DashboardFrame(int userId) {
         this.currentUserId = userId;
         
-        // --- THE MAGIC LINE: Force Java to use your modern OS theme ---
+        //   THE MAGIC LINE: Force Java to use your modern OS theme  
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
@@ -27,7 +27,7 @@ public class DashboardFrame extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // --- SLEEK TOP NAV BAR ---
+        //   SLEEK TOP NAV BAR  
         // Changed to match the Google Blue from your TimePanel
         Color primaryBlue = new Color(66, 133, 244); 
         
@@ -104,7 +104,7 @@ public class DashboardFrame extends JFrame {
         setVisible(true);
     }
 
-    // --- HELPER TO CREATE CLEAN NAV BUTTONS ---
+    //   HELPER TO CREATE CLEAN NAV BUTTONS  
     private JButton createNavButton(String text) {
         JButton btn = new JButton(text);
         btn.setForeground(Color.WHITE);
@@ -118,7 +118,7 @@ public class DashboardFrame extends JFrame {
         return btn;
     }
 
-    // --- VISUAL FEEDBACK FOR ACTIVE TABS ---
+    //   VISUAL FEEDBACK FOR ACTIVE TABS  
     private void setActiveTab(JButton activeBtn) {
         JButton[] allTabs = {timeBtn, healthBtn, financeBtn, profileBtn};
         
@@ -137,9 +137,7 @@ public class DashboardFrame extends JFrame {
         }
     }
 
-    // ==========================================
     // MODULE VIEWS
-    // ==========================================
 
     private void showTime() { 
         mainPanel.removeAll();
@@ -152,7 +150,6 @@ public class DashboardFrame extends JFrame {
     mainPanel.removeAll();
     mainPanel.setLayout(new BorderLayout()); 
     
-    // Only create it once so the checkbox marks are preserved
     if (cachedHealthPanel == null) {
         cachedHealthPanel = new HealthPanel(currentUserId);
     }
@@ -165,11 +162,9 @@ public class DashboardFrame extends JFrame {
     mainPanel.removeAll();
     mainPanel.setLayout(new BorderLayout());
     
-    // Cache logic: Only create the panel if it doesn't exist yet
     if (cachedFinancePanel == null) {
         cachedFinancePanel = new FinancePanel(currentUserId);
     } else {
-        // If it already exists, just refresh the data from the cloud
         cachedFinancePanel.refreshAllData();
     }
     

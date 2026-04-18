@@ -19,7 +19,6 @@ public class YearlyExpenseBarChart extends JPanel {
     public YearlyExpenseBarChart() {
         setBackground(Color.WHITE);
         setPreferredSize(new Dimension(600, 300));
-        // Initialize with current year
         selectedYear = LocalDate.now().getYear();
         for (int m = 1; m <= 12; m++) {
             monthlyTotals.put(m, 0.0);
@@ -33,7 +32,6 @@ public class YearlyExpenseBarChart extends JPanel {
             monthlyTotals.put(m, 0.0);
         }
 
-        // Filter transactions for the given year and type EXPENSE
         for (Transaction t : transactions) {
             if (!"EXPENSE".equals(t.type)) continue;
             LocalDate transDate = null;
@@ -50,7 +48,6 @@ public class YearlyExpenseBarChart extends JPanel {
             }
         }
 
-        // Calculate max for scaling
         maxTotal = monthlyTotals.values().stream().max(Double::compare).orElse(0.0);
         if (maxTotal <= 0) maxTotal = 1.0;
         repaint();

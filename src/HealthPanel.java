@@ -16,13 +16,11 @@ public class HealthPanel extends JPanel {
     private HealthDAO dao = new HealthDAO();
     private double userHeight;
     
-    // UI Elements for Live-Syncing
     private JLabel syncStatusLabel;
     private JLabel kjValueLabel;
     private javax.swing.Timer autoSaveTimer;
     private HealthDAO.HealthRecord currentRecord;
 
-    // References to charts for live-updating
     private BarChartPanel stepsChart;
     private BarChartPanel sleepChart;
 
@@ -58,7 +56,7 @@ public class HealthPanel extends JPanel {
         java.sql.Date sqlToday = java.sql.Date.valueOf(LocalDate.now());
         currentRecord = dao.getDailyRecord(userId, sqlToday);
 
-        // --- HEADER SECTION ---
+        //   HEADER SECTION  
         JPanel topSection = new JPanel(new BorderLayout());
         topSection.setBackground(Color.WHITE);
         topSection.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
@@ -75,7 +73,7 @@ public class HealthPanel extends JPanel {
         titleBox.add(syncStatusLabel);
         topSection.add(titleBox, BorderLayout.WEST);
 
-        // --- QUICK STATS ---
+        //   QUICK STATS  
         kjValueLabel = new JLabel(String.format("%.0f", calculateTotalKJ(currentRecord)));
         kjValueLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
         
@@ -94,7 +92,7 @@ public class HealthPanel extends JPanel {
         topSection.add(statsRow, BorderLayout.EAST);
         panel.add(topSection, BorderLayout.NORTH);
 
-        // --- DASHBOARD CONTENT ---
+        //   DASHBOARD CONTENT  
         JPanel mainContent = new JPanel();
         mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.Y_AXIS));
         mainContent.setOpaque(false);
@@ -107,7 +105,6 @@ public class HealthPanel extends JPanel {
         JSpinner stepSpinner = new JSpinner(new SpinnerNumberModel(currentRecord.steps, 0, 100000, 500));
         stepSpinner.addChangeListener(e -> { 
             currentRecord.steps = (Integer) stepSpinner.getValue(); 
-            // INSTANT chart update
             stepsChart.updateTodayValue(currentRecord.steps);
             triggerAutoSave(); 
         });
@@ -116,7 +113,6 @@ public class HealthPanel extends JPanel {
         JSpinner sleepSpinner = new JSpinner(new SpinnerNumberModel(currentRecord.sleep, 0.0, 24.0, 0.5));
         sleepSpinner.addChangeListener(e -> { 
             currentRecord.sleep = (Double) sleepSpinner.getValue(); 
-            // INSTANT chart update
             sleepChart.updateTodayValue(currentRecord.sleep);
             triggerAutoSave(); 
         });
@@ -133,7 +129,7 @@ public class HealthPanel extends JPanel {
 
         mainContent.add(cardsRow);
         
-        // --- CHARTS ROW ---
+        //   CHARTS ROW  
         JPanel chartsRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 10));
         chartsRow.setOpaque(false);
         stepsChart = new BarChartPanel(dao.getWeeklyMetric(userId, "STEPS"), new Color(66, 133, 244));
@@ -208,12 +204,12 @@ public class HealthPanel extends JPanel {
         private int h() { return getHeight(); }
     }
 
-    // --- ACTIVITY JOURNAL TAB ---
+    //   ACTIVITY JOURNAL TAB  
     private JPanel buildActivityJournalPanel() {
     JPanel panel = new JPanel(new BorderLayout());
     panel.setBackground(Color.WHITE);
 
-    // --- LEFT SIDE: THE LIST ---
+    //   LEFT SIDE 
     JPanel listPanel = new JPanel();
     listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
     listPanel.setBackground(new Color(250, 250, 252));
@@ -222,24 +218,23 @@ public class HealthPanel extends JPanel {
     refreshActivityList(listPanel); 
     panel.add(scroll, BorderLayout.CENTER);
 
-    // --- RIGHT SIDE: THE CONTROL CENTER ---
+    //   RIGHT SIDE 
     JPanel sidePanel = new JPanel();
     sidePanel.setLayout(new BoxLayout(sidePanel, BoxLayout.Y_AXIS));
     sidePanel.setBackground(Color.WHITE);
     sidePanel.setPreferredSize(new Dimension(350, 0));
     sidePanel.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, new Color(220, 220, 220)));
 
-    // 1. LIVE SESSION RECORDER
+    // LIVE SESSION RECORDER
     sidePanel.add(buildLiveRecorderSection(listPanel));
     
-    // Divider
     JSeparator sep = new JSeparator();
     sep.setMaximumSize(new Dimension(300, 1));
     sidePanel.add(Box.createRigidArea(new Dimension(0, 20)));
     sidePanel.add(sep);
     sidePanel.add(Box.createRigidArea(new Dimension(0, 20)));
 
-    // 2. MANUAL ENTRY FORM
+    // MANUAL ENTRY FORM
     sidePanel.add(buildManualEntrySection(listPanel));
 
     panel.add(sidePanel, BorderLayout.EAST);
@@ -277,7 +272,6 @@ private JPanel buildLiveRecorderSection(JPanel listPanel) {
 
     liveBtn.addActionListener(e -> {
         if (!isRecording) {
-            // START
             isRecording = true;
             sessionStartTime = System.currentTimeMillis();
             liveBtn.setText("Stop & Save");
@@ -293,15 +287,12 @@ private JPanel buildLiveRecorderSection(JPanel listPanel) {
             });
             sessionTimer.start();
         } else {
-        // STOP
         isRecording = false;
         sessionTimer.stop();
         long sessionEndTime = System.currentTimeMillis();
         
-        // Calculate exact milliseconds
         long diff = sessionEndTime - sessionStartTime;
         
-        // VALIDATION: If less than 60,000ms (1 minute)
         if (diff < 60000) {
             JOptionPane.showMessageDialog(this, "Activity too short to store (minimum 1 minute).", "Session Discarded", JOptionPane.PLAIN_MESSAGE);
         } else {
@@ -312,7 +303,6 @@ private JPanel buildLiveRecorderSection(JPanel listPanel) {
             kjValueLabel.setText(String.format("%.0f", calculateTotalKJ(currentRecord)));
         }
         
-        // Reset UI regardless of whether it saved or not
         liveBtn.setText("Start Tracking");
         liveBtn.setBackground(new Color(66, 133, 244));
         liveTimerLabel.setText("00:00:00");
@@ -378,7 +368,6 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
 
     long diff = calE.getTimeInMillis() - calS.getTimeInMillis();
     
-    // VALIDATION
     if (diff < 60000) {
         JOptionPane.showMessageDialog(this, "Activity too short to store (minimum 1 minute).", "Invalid Duration", JOptionPane.PLAIN_MESSAGE);
         return;
@@ -405,7 +394,6 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
     java.sql.Date today = java.sql.Date.valueOf(LocalDate.now());
     double w = dao.getDailyRecord(userId, today).weight; if (w <= 0) w = 70.0;
     
-    // Updated formatter to include seconds
     java.text.SimpleDateFormat timeFormat = new java.text.SimpleDateFormat("dd MMM, HH:mm:ss");
 
     for (HealthDAO.ActivityLog log : dao.getActivities(userId)) {
@@ -420,7 +408,6 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
         JLabel title = new JLabel(log.activity + " (" + log.duration + " mins" + (log.distance > 0 ? " | " + log.distance + "km" : "") + ")");
         title.setFont(new Font("Segoe UI", Font.BOLD, 18));
         
-        // Using the new timeFormat with seconds
         JLabel info = new JLabel("🔥 ~" + (int)kcal + " kcal  |  🕒 " + timeFormat.format(log.startTime));
         info.setForeground(Color.GRAY);
         
@@ -438,7 +425,7 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
     listPanel.revalidate(); listPanel.repaint();
 }
 
-    // --- MEDICATIONS TAB ---
+    //   MEDICATIONS TAB  
     private JPanel buildMedicationsPanel() {
         JPanel panel = new JPanel(new BorderLayout()); panel.setBackground(Color.WHITE);
         JPanel listPanel = new JPanel(); listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS)); listPanel.setBackground(new Color(250, 250, 252));
@@ -463,21 +450,19 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
     // Fetch the list of medications for the current user
     for (HealthDAO.Medication med : dao.getMedications(userId)) {
         
-        // --- CARD SETUP ---
         JPanel card = new JPanel(new BorderLayout()); 
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(new Color(235, 237, 240), 1, true), 
             BorderFactory.createEmptyBorder(15, 20, 15, 20)));
         
-        // Slightly taller to fit the checkbox row
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 130));
 
         JPanel mainContent = new JPanel();
         mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.Y_AXIS));
         mainContent.setOpaque(false);
 
-        // --- 1. MEDICATION INFO ---
+        // MEDICATION INFO  
         JLabel title = new JLabel(med.name + " (" + med.dosage + ")"); 
         title.setFont(new Font("Segoe UI", Font.BOLD, 17));
         
@@ -489,21 +474,20 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
         mainContent.add(detail);
         mainContent.add(Box.createRigidArea(new Dimension(0, 10))); // Spacing
 
-        // --- 2. DYNAMIC DOSE TRACKER (DB-BACKED) ---
+        // DYNAMIC DOSE TRACKER (DB-BACKED)  
         // Fetch which doses were already taken today from Neon
         Set<Integer> takenDoses = dao.getTakenDosesToday(userId, med.medId);
 
-        // Logic: 24 hours / interval = doses per day
         int dosesPerDay = Math.max(1, 24 / med.gap); 
         
         JPanel doseBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         doseBoxPanel.setOpaque(false);
         
         for (int i = 1; i <= dosesPerDay; i++) {
-            final int doseIndex = i; // Needed for the listener
+            final int doseIndex = i;
             JCheckBox doseCheck = new JCheckBox("Dose " + i);
             doseCheck.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            doseCheck.setOpaque(false); // Mac visual fix
+            doseCheck.setOpaque(false);
 
             // Restore the saved state from the database
             if (takenDoses.contains(doseIndex)) {
@@ -519,7 +503,7 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
         }
         mainContent.add(doseBoxPanel);
 
-        // --- 3. DELETE BUTTON ---
+        // DELETE BUTTON  
         JButton del = new JButton("✕"); 
         del.setForeground(Color.RED); 
         del.setContentAreaFilled(false); 
@@ -544,12 +528,11 @@ private JPanel buildManualEntrySection(JPanel listPanel) {
         listPanel.add(Box.createRigidArea(new Dimension(0, 10)));
     }
     
-    // Refresh the UI container
     listPanel.revalidate(); 
     listPanel.repaint();
 }
 
-    // --- HELPERS ---
+    //   HELPERS  
     private double calculateTotalKJ(HealthDAO.HealthRecord record) {
         double kj = record.steps * 0.15; double w = record.weight > 0 ? record.weight : 70.0;
         List<HealthDAO.ActivityLog> logs = dao.getActivities(userId); LocalDate today = LocalDate.now();

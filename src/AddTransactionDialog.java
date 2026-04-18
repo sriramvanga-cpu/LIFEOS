@@ -67,7 +67,7 @@ public class AddTransactionDialog extends JDialog {
         setLayout(new BorderLayout());
         getContentPane().setBackground(WHITE);
 
-        // --- Mode Tabs ---
+        // Mode Tabs
         JPanel modePanel = new JPanel(new GridLayout(1, 3, 0, 0));
         modePanel.setBackground(WHITE);
         modePanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(230, 230, 230)));
@@ -80,7 +80,7 @@ public class AddTransactionDialog extends JDialog {
         modePanel.add(incomeBtn);
         modePanel.add(transferBtn);
 
-        // --- Form Panel ---
+        // Form Panel
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
         formPanel.setBackground(WHITE);
@@ -248,7 +248,7 @@ public class AddTransactionDialog extends JDialog {
         add(scrollPane, BorderLayout.CENTER);
         add(actionPanel, BorderLayout.SOUTH);
 
-        // --- Keyboard support ---
+        //Keyboard support
         keyManager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
         keyDispatcher = new KeyEventDispatcher() {
             @Override

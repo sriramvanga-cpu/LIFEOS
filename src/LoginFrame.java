@@ -30,7 +30,7 @@ public class LoginFrame extends JFrame {
 
         JLabel title = new JLabel("LIFEOS");
         title.setFont(new Font("Arial", Font.BOLD, 28));
-        title.setForeground(new Color(100, 149, 237)); // light blue
+        title.setForeground(new Color(100, 149, 237));
 
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -53,7 +53,6 @@ public class LoginFrame extends JFrame {
         emailField.setBackground(Color.WHITE);
         emailField.setForeground(Color.BLACK);
         emailField.setFont(new Font("Arial", Font.PLAIN, 18));
-        // --- 4. VISUAL POLISH: Internal padding for text fields ---
         emailField.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Color.LIGHT_GRAY), 
             BorderFactory.createEmptyBorder(5, 10, 5, 10)
@@ -75,7 +74,7 @@ public class LoginFrame extends JFrame {
         passwordField.setBackground(Color.WHITE);
         passwordField.setForeground(Color.BLACK);
         passwordField.setFont(new Font("Arial", Font.PLAIN, 18));
-        // --- 4. VISUAL POLISH: Internal padding for text fields ---
+        //   4. VISUAL POLISH: Internal padding for text fields  
         passwordField.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Color.LIGHT_GRAY), 
             BorderFactory.createEmptyBorder(5, 10, 5, 10)
@@ -124,10 +123,10 @@ public class LoginFrame extends JFrame {
 
         add(panel);
 
-        // --- BUTTON ACTION ---
+        //   BUTTON ACTION  
         loginButton.addActionListener(e -> handleLogin());
 
-        // --- 1. PRESS ENTER TO LOGIN: Listen for Enter key in the password field ---
+        //Listen for Enter key in the password field  
         passwordField.addActionListener(e -> handleLogin());
 
         setVisible(true);
@@ -138,7 +137,7 @@ public class LoginFrame extends JFrame {
         String email = emailField.getText().trim();
         String password = new String(passwordField.getPassword());
 
-        // --- 2. FAST VALIDATION: Prevent unnecessary database queries ---
+        // Prevent unnecessary database queries  
         if (email.isEmpty() || password.isEmpty()) {
             errorLabel.setText("Please enter both email and password.");
             return;

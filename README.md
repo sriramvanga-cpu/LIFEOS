@@ -42,7 +42,7 @@ LifeOS is a modern desktop application built with Java Swing and PostgreSQL that
 ## 🛠️ Tech Stack
 
 | Layer        | Technology                          |
-|--------------|-------------------------------------|
+|    --|            -|
 | Frontend     | Java Swing (Flat, modern UI)        |
 | Backend      | Java JDBC                           |
 | Database     | PostgreSQL (Neon Serverless / local)|
