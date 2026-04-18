@@ -79,11 +79,11 @@ Note: The project currently uses a Neon cloud connection string. Replace it with
    Using terminal / command prompt:
 #### Compile all Java files (include the JDBC driver in classpath)
 ```
-javac -cp ".;lib/postgresql-42.7.3.jar" *.java
+javac -cp "lib/*" -d bin src/*.java
 ```
 #### Run the application
 ```
-java -cp ".;lib/postgresql-42.7.3.jar" MainSwing
+java -cp "bin:lib/*" MainSwing
 ```
 Using an IDE (IntelliJ / Eclipse / VS Code):
 Add the PostgreSQL JDBC driver JAR to the project's build path.
